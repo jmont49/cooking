@@ -1,0 +1,169 @@
+openapi: 3.1.0
+info:
+  title: Shua Cooking Tool API
+  version: 1.0.0
+  description: Narrow, authenticated tools over Shua's deterministic cooking domain.
+  license: { name: Private personal use, identifier: LicenseRef-Private }
+servers:
+  - url: https://PROJECT.supabase.co/functions/v1/api/api/v1
+security:
+  - bearerAuth: []
+paths:
+  /inventory:
+    get:
+      operationId: getInventory
+      summary: Get confirmed, reserved, and projected inventory
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Error' }
+  /inventory/expiring:
+    get:
+      operationId: getExpiringItems
+      summary: Get items expiring in the next three days
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Error' }
+  /inventory/adjust:
+    post:
+      operationId: adjustInventory
+      summary: Apply an auditable inventory adjustment
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/ConfirmationToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InventoryAdjustment' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '409': { $ref: '#/components/responses/ConfirmationRequired' }
+  /plans/current:
+    get:
+      operationId: getCurrentWeekPlan
+      summary: Get the current sequential plan
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Error' }
+  /recipes:
+    get:
+      operationId: searchRecipes
+      summary: Get saved recipes and versions
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Error' }
+  /recipes/generate:
+    post:
+      operationId: generateRecipeDraft
+      summary: Generate but do not save a recipe draft
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecipeConstraints' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+  /recipes/adapt:
+    post:
+      operationId: adaptRecipeDraft
+      summary: Generate an unsaved recipe version
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, required: [recipeId, instructions], properties: { recipeId: { type: string, format: uuid }, instructions: { type: array, items: { type: string } } } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Error' }
+  /feedback/interpret:
+    post:
+      operationId: interpretFeedback
+      summary: Propose structured signals without accepting them
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, required: [notes], properties: { notes: { type: string, maxLength: 4000 }, tags: { type: array, items: { type: string } } } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Error' }
+  /groceries:
+    get:
+      operationId: getGroceryList
+      summary: Get the active consolidated grocery list
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Error' }
+  /budget:
+    get:
+      operationId: getBudgetSummary
+      summary: Get monthly budget status
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Error' }
+  /integration-tokens:
+    post:
+      operationId: createIntegrationToken
+      summary: Create a one-time-display scoped token
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                scopes: { type: array, items: { $ref: '#/components/schemas/Scope' } }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, description: Supabase user JWT or a scoped `mise_` integration token. }
+  parameters:
+    IdempotencyKey: { name: Idempotency-Key, in: header, required: true, schema: { type: string, minLength: 8, maxLength: 200 } }
+    ConfirmationToken: { name: X-Confirmation-Token, in: header, required: false, schema: { type: string } }
+  schemas:
+    Scope:
+      type: string
+      enum: [inventory:read, inventory:write, plans:read, plans:write, recipes:read, recipes:write, cooking:write, feedback:write, groceries:read, groceries:write, budget:read]
+    InventoryAdjustment:
+      type: object
+      required: [inventoryItemId, quantityDelta, unit, reason]
+      properties:
+        inventoryItemId: { type: string, format: uuid }
+        quantityDelta: { type: string, pattern: '^-?\d+(\.\d{1,4})?$' }
+        unit: { type: string }
+        reason: { type: string, enum: [manual, discarded, expired, cooking_difference] }
+    RecipeConstraints:
+      type: object
+      properties:
+        protein: { type: string }
+        servings: { type: number, exclusiveMinimum: 0 }
+        budget: { type: number, exclusiveMinimum: 0 }
+        minutes: { type: integer, minimum: 5 }
+        constraints: { type: array, items: { type: string } }
+    Error:
+      type: object
+      required: [requestId, error]
+      properties:
+        requestId: { type: string }
+        error:
+          type: object
+          required: [code, message, retryable]
+          properties: { code: { type: string }, message: { type: string }, retryable: { type: boolean }, fields: { type: object, additionalProperties: { type: string } } }
+    ConfirmationRequired:
+      type: object
+      required: [status, confirmationToken, summary, expiresAt]
+      properties: { status: { const: confirmation_required }, confirmationToken: { type: string }, summary: { type: string }, expiresAt: { type: string, format: date-time } }
+  responses:
+    Success:
+      description: Successful response
+      content: { application/json: { schema: { type: object, required: [requestId, data], properties: { requestId: { type: string }, data: {} } } } }
+    Error:
+      description: Structured error
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    ConfirmationRequired:
+      description: The user must approve the summarized action
+      content: { application/json: { schema: { type: object, required: [requestId, data], properties: { requestId: { type: string }, data: { $ref: '#/components/schemas/ConfirmationRequired' } } } } }

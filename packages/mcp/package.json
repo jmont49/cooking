@@ -1,0 +1,10 @@
+{
+  "name": "@mise/mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "bin": { "mise-mcp": "dist/index.js" },
+  "main": "dist/index.js",
+  "scripts": { "build": "tsc -p tsconfig.json", "typecheck": "tsc -p tsconfig.json --noEmit", "start": "node dist/index.js" },
+  "dependencies": { "@modelcontextprotocol/sdk": "1.30.0", "zod": "3.25.76" },
+  "devDependencies": { "@types/node": "22.5.0", "typescript": "5.5.4" }
+}
