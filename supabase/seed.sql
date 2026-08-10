@@ -1,5 +1,5 @@
 -- Deterministic local-development owner. The browser demo does not bypass production auth;
--- use magic link for manual Supabase testing or the local inbox at http://127.0.0.1:54324.
+-- Local password login: cook@mise.local / mise-local-only.
 insert into auth.users (instance_id,id,aud,role,email,encrypted_password,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at,confirmation_token,email_change,email_change_token_new,recovery_token)
 values ('00000000-0000-0000-0000-000000000000','11111111-1111-4111-8111-111111111111','authenticated','authenticated','cook@mise.local',crypt('mise-local-only',gen_salt('bf')),now(),'{"provider":"email","providers":["email"]}','{"display_name":"Josh"}',now(),now(),'','','','') on conflict(id) do nothing;
 insert into public.profiles(id,display_name) values('11111111-1111-4111-8111-111111111111','Josh') on conflict do nothing;

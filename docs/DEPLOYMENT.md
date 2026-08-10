@@ -6,7 +6,7 @@
 2. Apply migrations with `npx supabase db push`.
 3. Set server-only secrets from `.env.example` with `npx supabase secrets set --env-file .env.functions`.
 4. Deploy the API with `npx supabase functions deploy api --no-verify-jwt`. The function performs user-JWT and integration-token validation itself.
-5. Enable magic-link email authentication and add the production application URL to allowed redirects.
+5. In Authentication > Users, create the private owner account with a strong password and mark it confirmed. In Authentication > Providers > Email, leave email/password enabled and disable new-user signups after the owner exists. Normal sign-in sends no email.
 
 ## Cloudflare Pages
 

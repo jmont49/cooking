@@ -13,7 +13,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-`VITE_DEMO_MODE=true` runs the complete browser experience from persistent local demo data at http://localhost:5173 with no credentials. Reset it from Settings. This is for development and product evaluation; production uses magic-link auth and Supabase RLS.
+`VITE_DEMO_MODE=true` runs the complete browser experience from persistent local demo data at http://localhost:5173 with no credentials. Reset it from Settings. This is for development and product evaluation; production uses password auth and Supabase RLS.
 
 For the database and API:
 
@@ -60,7 +60,7 @@ See [deployment instructions](docs/DEPLOYMENT.md). Normal hosting uses Cloudflar
 ## Troubleshooting
 
 - **Blank local API data:** run `npx supabase db reset`, then confirm `.env.local` uses values from `npx supabase status`.
-- **Magic link does not return:** add the exact application origin to Supabase Auth redirect URLs.
+- **Password login fails:** confirm the user exists and is confirmed in Supabase Authentication > Users.
 - **AI configuration error:** return to `AI_PROVIDER=mock`; no other feature requires AI.
 - **Stale PWA assets:** unregister the development service worker or clear the `mise-pages` cache after a schema-breaking frontend update.
 - **MCP exits immediately:** set both `MISE_API_URL` and `MISE_INTEGRATION_TOKEN`; tokens are shown only when created.

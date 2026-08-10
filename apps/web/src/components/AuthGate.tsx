@@ -1,4 +1,4 @@
-import { ChefHat, Loader2, Mail } from "lucide-react";
+import { ChefHat, Loader2, LockKeyhole } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { demoMode, supabase } from "../lib/supabase";
@@ -7,7 +7,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(!demoMode);
   const [email, setEmail] = useState("");
-  const [sent, setSent] = useState(false);
+  const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
     if (demoMode) return;
@@ -42,58 +43,62 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    const { error: authError } = await client.auth.signInWithOtp({
+    setSubmitting(true);
+    const { error: authError } = await client.auth.signInWithPassword({
       email,
-      options: { emailRedirectTo: window.location.origin },
+      password,
     });
-    if (authError) setError(authError.message);
-    else setSent(true);
+    if (authError) setError("That email and password did not match.");
+    setSubmitting(false);
   };
   return (
     <AuthCard>
-      {sent ? (
-        <div className="text-center">
-          <Mail className="mx-auto text-herb-600" size={34} />
-          <h1 className="mt-4 text-3xl">Check your inbox</h1>
-          <p className="mt-2 text-sm text-ink/55">
-            Your secure sign-in link is on its way to {email}.
+      <form onSubmit={submit}>
+        <p className="eyebrow">Your personal kitchen</p>
+        <h1 className="mt-3 text-4xl">Welcome to Shua.</h1>
+        <p className="mt-3 text-sm leading-6 text-ink/55">
+          Sign in with your private account. No email is sent.
+        </p>
+        <label className="mt-7 block text-sm font-semibold">
+          Email address
+          <input
+            required
+            type="email"
+            className="field mt-2"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="username"
+          />
+        </label>
+        <label className="mt-4 block text-sm font-semibold">
+          Password
+          <input
+            required
+            minLength={8}
+            type="password"
+            className="field mt-2"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+          />
+        </label>
+        {error && (
+          <p
+            role="alert"
+            className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700"
+          >
+            {error}
           </p>
-          <button className="btn-secondary mt-6" onClick={() => setSent(false)}>
-            Use another email
-          </button>
-        </div>
-      ) : (
-        <form onSubmit={submit}>
-          <p className="eyebrow">Your personal kitchen</p>
-          <h1 className="mt-3 text-4xl">Welcome to Shua.</h1>
-          <p className="mt-3 text-sm leading-6 text-ink/55">
-            Sign in with a magic link. No password to remember.
-          </p>
-          <label className="mt-7 block text-sm font-semibold">
-            Email address
-            <input
-              required
-              type="email"
-              className="field mt-2"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-            />
-          </label>
-          {error && (
-            <p
-              role="alert"
-              className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700"
-            >
-              {error}
-            </p>
+        )}
+        <button className="btn-primary mt-5 w-full" disabled={submitting}>
+          {submitting ? (
+            <Loader2 className="animate-spin" size={17} />
+          ) : (
+            <LockKeyhole size={17} />
           )}
-          <button className="btn-primary mt-5 w-full">
-            <Mail size={17} />
-            Email me a sign-in link
-          </button>
-        </form>
-      )}
+          {submitting ? "Signing in…" : "Sign in"}
+        </button>
+      </form>
     </AuthCard>
   );
 }
