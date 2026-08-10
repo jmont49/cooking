@@ -7,6 +7,7 @@
 3. Set server-only secrets from `.env.example` with `npx supabase secrets set --env-file .env.functions`.
 4. Deploy the API with `npx supabase functions deploy api --no-verify-jwt`. The function performs user-JWT and integration-token validation itself.
 5. In Authentication > Users, create the private owner account with a strong password and mark it confirmed. In Authentication > Providers > Email, leave email/password enabled and disable new-user signups after the owner exists. Normal sign-in sends no email.
+6. Store `UNSPLASH_ACCESS_KEY` with `npx supabase secrets set`; never expose it as a `VITE_*` variable. Recipe cards hotlink the API-returned CDN URL and retain required photographer/source attribution.
 
 ## Cloudflare Pages
 

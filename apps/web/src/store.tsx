@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import Decimal from 'decimal.js';
 import { consume, groceryList, prioritizeConfirmation, projected, release, reserve, scoreRecommendation, type GroceryRequirement, type InventoryItem, type PlannedMeal, type Recipe } from '@mise/domain';
 import { initialInventory, recipes as seedRecipes } from './data';
-import { inventoryApi, type IngredientOption, type InventoryRow } from './lib/api';
+import { inventoryApi, recipeApi, type IngredientOption, type InventoryRow } from './lib/api';
 import { demoMode } from './lib/supabase';
 
 interface Feedback { id: string; mealTitle: string; rating: number; wouldMakeAgain: boolean; tags: string[]; notes: string; createdAt: string }
@@ -11,6 +11,8 @@ interface Store extends State {
   ingredientCatalog: IngredientOption[];
   inventoryLoading: boolean;
   inventoryError: string;
+  recipesLoading: boolean;
+  recipesError: string;
   grocery: GroceryRequirement[];
   recommendations: Array<{recipe: Recipe; score: ReturnType<typeof scoreRecommendation>}>;
   confirmationQueue: InventoryItem[];
@@ -21,6 +23,7 @@ interface Store extends State {
   adjustInventory(id: string, quantity: string): Promise<void>;
   addInventory(input:{ingredientId:string;quantity:string;unit:InventoryItem['unit'];location:string;expiresOn?:string}):Promise<void>;
   refreshInventory():Promise<void>;
+  refreshRecipes():Promise<void>;
   completeMeal(id: string): void;
   addFeedback(mealTitle: string, rating: number, notes: string, tags: string[]): void;
   toggleGrocery(key: string): void;
@@ -36,13 +39,16 @@ const mapInventory=(row:InventoryRow):InventoryItem=>({id:row.id,ingredientId:ro
 const demoIngredients:IngredientOption[]=initialInventory.map(item=>({id:item.ingredientId,slug:item.ingredientId,name:item.name,category:item.location==='Pantry'?'Pantry':'Produce',default_unit:item.unit,perishable:Boolean(item.expiresOn),default_shelf_days:null}));
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<State>(() => { if(!demoMode)return {...initialState(),inventory:[],confirmedIds:[]};try { return JSON.parse(localStorage.getItem(KEY) ?? '') as State; } catch { return initialState(); } });
+  const [state, setState] = useState<State>(() => { if(!demoMode)return {...initialState(),inventory:[],recipes:[],meals:[],feedback:[],confirmedIds:[]};try { return JSON.parse(localStorage.getItem(KEY) ?? '') as State; } catch { return initialState(); } });
   const [ingredientCatalog,setIngredientCatalog]=useState<IngredientOption[]>(demoMode?demoIngredients:[]);
   const [inventoryLoading,setInventoryLoading]=useState(!demoMode);
   const [inventoryError,setInventoryError]=useState('');
+  const [recipesLoading,setRecipesLoading]=useState(!demoMode);
+  const [recipesError,setRecipesError]=useState('');
   useEffect(() => { if(demoMode)localStorage.setItem(KEY, JSON.stringify(state)); }, [state]);
 
   const refreshInventory=useCallback(async()=>{if(demoMode)return;setInventoryLoading(true);setInventoryError('');try{const [rows,ingredients]=await Promise.all([inventoryApi.list(),inventoryApi.ingredients()]);setState(s=>({...s,inventory:rows.map(mapInventory)}));setIngredientCatalog(ingredients)}catch(error){setInventoryError(error instanceof Error?error.message:'Inventory could not be loaded.')}finally{setInventoryLoading(false)}},[]);
+  const refreshRecipes=useCallback(async()=>{if(demoMode)return;setRecipesLoading(true);setRecipesError('');try{const recipes=await recipeApi.list();setState(s=>({...s,recipes}))}catch(error){setRecipesError(error instanceof Error?error.message:'Recipes could not be loaded.')}finally{setRecipesLoading(false)}},[]);
   useEffect(()=>{
     void refreshInventory();
     if(demoMode)return;
@@ -52,6 +58,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const interval=window.setInterval(refresh,30000);
     return()=>{window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);window.clearInterval(interval)};
   },[refreshInventory]);
+  useEffect(()=>{void refreshRecipes()},[refreshRecipes]);
 
   const plannedRecipes = useMemo(() => state.meals.filter(m => m.status === 'planned' && m.recipeId).map(m => ({ recipe: state.recipes.find(r => r.id === m.recipeId)!, servings: m.servings })).filter(x => x.recipe), [state.meals,state.recipes]);
   const grocery = useMemo(() => groceryList(plannedRecipes, state.inventory), [plannedRecipes,state.inventory]);
@@ -85,7 +92,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const purchaseGroceries=()=>setState(s=>{const purchased=grocery.filter(g=>s.groceryChecked.includes(`${g.ingredientId}:${g.unit}`));let inventory=[...s.inventory];for(const row of purchased){const found=inventory.find(i=>i.ingredientId===row.ingredientId&&i.unit===row.unit);if(found)inventory=inventory.map(i=>i.id===found.id?{...i,quantity:String(Number(i.quantity)+Number(row.quantity)),confidence:1}:i);else inventory.push({id:crypto.randomUUID(),ingredientId:row.ingredientId,name:row.name,quantity:row.quantity,reserved:'0',unit:row.unit,confidence:1,location:'Pantry',lastConfirmedAt:new Date().toISOString()});}return {...s,inventory,groceryChecked:[],monthlySpent:String((Number(s.monthlySpent)+purchased.reduce((n,g)=>n+Math.max(1,Number(g.quantity)*1.25),0)).toFixed(2))};});
   const addRecipe=(recipe:Recipe)=>setState(s=>({...s,recipes:[recipe,...s.recipes]}));
   const resetDemo=()=>setState(initialState());
-  return <Context.Provider value={{...state,ingredientCatalog,inventoryLoading,inventoryError,grocery,recommendations,confirmationQueue,planMeal,removeMeal,setMealStatus,confirmInventory,adjustInventory,addInventory,refreshInventory,completeMeal,addFeedback,toggleGrocery,purchaseGroceries,addRecipe,resetDemo}}>{children}</Context.Provider>;
+  return <Context.Provider value={{...state,ingredientCatalog,inventoryLoading,inventoryError,recipesLoading,recipesError,grocery,recommendations,confirmationQueue,planMeal,removeMeal,setMealStatus,confirmInventory,adjustInventory,addInventory,refreshInventory,refreshRecipes,completeMeal,addFeedback,toggleGrocery,purchaseGroceries,addRecipe,resetDemo}}>{children}</Context.Provider>;
 }
 
 export function useStore(){const store=useContext(Context);if(!store)throw new Error('StoreProvider missing');return store;}

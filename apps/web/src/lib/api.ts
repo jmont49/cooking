@@ -1,4 +1,5 @@
-import type { Unit } from '@mise/domain';
+import type { Recipe, Unit } from '@mise/domain';
+import type { GeneratedRecipe } from '@mise/contracts';
 import { supabase } from './supabase';
 
 const apiUrl=(import.meta.env.VITE_API_URL as string|undefined)?.replace(/\/$/,'');
@@ -9,6 +10,9 @@ export interface IngredientOption{id:string;slug:string;name:string;category:str
 export interface InventoryRow{id:string;ingredient_id:string;quantity:string;reserved_quantity:string;unit:Unit;confidence:string;estimated_expiration_date:string|null;last_confirmed_at:string|null;ingredients:{name:string;category:string};storage_locations:{name:string}|null}
 export type IntegrationScope='inventory:read'|'inventory:write'|'recipes:read'|'recipes:write'|'plans:read'|'plans:write'|'cooking:write'|'feedback:write'|'groceries:read'|'groceries:write'|'budget:read';
 export interface CreatedIntegrationToken{id:string;name:string;token_prefix:string;scopes:IntegrationScope[];created_at:string;token:string;displayedOnce:true}
+export interface PhotoCandidate{id:string;imageUrl:string;thumbUrl:string;altText:string;photographerName:string;photographerUrl:string;sourceUrl:string;downloadLocation:string;provider:'unsplash'}
+export interface RecipeJob{id:string;status:'queued'|'processing'|'ready'|'failed'|'saved'|'discarded';request:{protein:string;minutes:number;servings:number;notes:string};recipe_draft:GeneratedRecipe|null;photo_candidates:PhotoCandidate[];error_code:string|null;created_at:string;updated_at:string}
+interface RecipeRow{id:string;title:string;description:string;primary_photo_url:string|null;photo_attribution:Recipe['photoAttribution']|null;recipe_tags:Array<{tag:string}>;recipe_versions:Array<{id:string;version:number;servings:string;prep_minutes:number;cook_minutes:number;difficulty:Recipe['difficulty'];estimated_cost:string|null;cuisine:string|null;protein:string|null;cleanup:number|null;leftover_quality:number|null;leftover_days:number|null;reheating:string|null;safety_notes:string[];equipment:string[];recipe_ingredients:Array<{ingredient_id:string|null;unresolved_name:string|null;quantity:string;unit:Unit;optional:boolean;sort_order:number;ingredients:{name:string}|null}>;recipe_steps:Array<{step_number:number;instruction:string}>}>}
 
 export class ShuaApiError extends Error{constructor(public code:string,message:string,public retryable=false,public confirmationToken?:string,public summary?:string){super(message)}}
 
@@ -39,4 +43,13 @@ export const inventoryApi={
 
 export const integrationApi={
   create:(name:string,scopes:IntegrationScope[])=>request<CreatedIntegrationToken>('/v1/integration-tokens',{method:'POST',body:JSON.stringify({name,scopes})})
+};
+
+const mapRecipe=(row:RecipeRow):Recipe=>{const version=[...row.recipe_versions].sort((a,b)=>b.version-a.version)[0];if(!version)throw new Error(`Recipe ${row.title} has no version.`);return {id:row.id,version:version.version,title:row.title,description:row.description,cuisine:version.cuisine??'Unspecified',protein:version.protein??'Other',servings:Number(version.servings),prepMinutes:version.prep_minutes,cookMinutes:version.cook_minutes,difficulty:version.difficulty,estimatedCost:String(version.estimated_cost??'0'),cleanup:Math.min(5,Math.max(1,version.cleanup??2)) as Recipe['cleanup'],leftoverQuality:Math.min(5,Math.max(1,version.leftover_quality??3)) as Recipe['leftoverQuality'],leftoverDays:version.leftover_days??3,ingredients:[...version.recipe_ingredients].sort((a,b)=>a.sort_order-b.sort_order).map(item=>({ingredientId:item.ingredient_id??`unresolved:${item.unresolved_name}`,name:item.ingredients?.name??item.unresolved_name??'Unresolved ingredient',quantity:String(item.quantity),unit:item.unit,optional:item.optional})),steps:[...version.recipe_steps].sort((a,b)=>a.step_number-b.step_number).map(step=>step.instruction),tags:row.recipe_tags.map(tag=>tag.tag),...(version.safety_notes[0]?{safetyNote:version.safety_notes.join(' ')}:{}),reheating:version.reheating??'Reheat until steaming hot.',equipment:version.equipment,...(row.primary_photo_url?{photoUrl:row.primary_photo_url}:{}),...(row.photo_attribution?{photoAttribution:row.photo_attribution}:{})}};
+
+export const recipeApi={
+  list:async()=>((await request<RecipeRow[]>('/v1/recipes')).map(mapRecipe)),
+  createJob:(input:{protein:string;minutes:number;servings:number;notes:string})=>request<RecipeJob>('/v1/recipe-jobs',{method:'POST',body:JSON.stringify(input)}),
+  getJob:(id:string)=>request<RecipeJob>(`/v1/recipe-jobs/${id}`),
+  saveJob:(id:string,recipe:GeneratedRecipe,selectedPhoto:PhotoCandidate|null)=>request<{recipeId:string;recipeVersionId:string}>(`/v1/recipe-jobs/${id}/save`,{method:'POST',body:JSON.stringify({recipe,selectedPhoto})})
 };

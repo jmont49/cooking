@@ -1,0 +1,19 @@
+{
+  "name": "@shua/miso-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/apps/miso-worker/src/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/apps/miso-worker/src/index.js"
+  },
+  "dependencies": {
+    "@mise/contracts": "1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.0",
+    "typescript": "5.5.4"
+  }
+}

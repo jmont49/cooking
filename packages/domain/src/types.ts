@@ -57,6 +57,8 @@ export interface Recipe {
   safetyNote?: string;
   reheating: string;
   equipment: string[];
+  photoUrl?: string;
+  photoAttribution?: { photographerName: string; photographerUrl: string; sourceUrl: string };
 }
 
 export interface PlannedMeal {

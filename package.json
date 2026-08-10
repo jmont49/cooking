@@ -11,7 +11,7 @@
   },
   "scripts": {
     "dev": "npm run dev -w @mise/web",
-    "build": "npm run build -w @mise/domain && npm run build -w @mise/contracts && npm run build -w @mise/mcp && npm run build -w @mise/web",
+    "build": "npm run build -w @mise/domain && npm run build -w @mise/contracts && npm run build -w @mise/mcp && npm run build -w @shua/miso-worker && npm run build -w @mise/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "test:e2e": "playwright test",

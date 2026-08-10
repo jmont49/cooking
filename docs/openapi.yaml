@@ -5,7 +5,7 @@ info:
   description: Narrow, authenticated tools over Shua's deterministic cooking domain.
   license: { name: Private personal use, identifier: LicenseRef-Private }
 servers:
-  - url: https://PROJECT.supabase.co/functions/v1/api/api/v1
+  - url: https://PROJECT.supabase.co/functions/v1/api/v1
 security:
   - bearerAuth: []
 paths:
@@ -77,6 +77,51 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/Success' }
         '401': { $ref: '#/components/responses/Error' }
+  /recipe-jobs:
+    post:
+      operationId: createRecipeJob
+      summary: Queue a recipe request for the user's Miso worker
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/RecipeJobRequest' } } }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Error' }
+  /recipe-jobs/claim:
+    post:
+      operationId: claimRecipeJob
+      summary: Claim the oldest queued recipe job for a scoped Miso worker
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Error' }
+  /recipe-jobs/{jobId}:
+    parameters: [ { name: jobId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    get:
+      operationId: getRecipeJob
+      summary: Read recipe job status and its review draft
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '404': { $ref: '#/components/responses/Error' }
+  /recipe-jobs/{jobId}/complete:
+    parameters: [ { name: jobId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      operationId: completeRecipeJob
+      summary: Submit a schema-validated Miso draft and attach Unsplash candidates
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '422': { $ref: '#/components/responses/Error' }
+  /recipe-jobs/{jobId}/save:
+    parameters: [ { name: jobId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      operationId: saveRecipeJob
+      summary: Save an edited recipe draft and reviewed Unsplash selection
+      parameters: [ { $ref: '#/components/parameters/IdempotencyKey' } ]
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '422': { $ref: '#/components/responses/Error' }
   /feedback/interpret:
     post:
       operationId: interpretFeedback
@@ -144,6 +189,14 @@ components:
         budget: { type: number, exclusiveMinimum: 0 }
         minutes: { type: integer, minimum: 5 }
         constraints: { type: array, items: { type: string } }
+    RecipeJobRequest:
+      type: object
+      required: [protein, minutes, servings, notes]
+      properties:
+        protein: { type: string, maxLength: 80 }
+        minutes: { type: integer, minimum: 10, maximum: 720 }
+        servings: { type: integer, minimum: 1, maximum: 24 }
+        notes: { type: string, maxLength: 2000 }
     Error:
       type: object
       required: [requestId, error]
