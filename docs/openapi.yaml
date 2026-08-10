@@ -120,7 +120,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
 components:
   securitySchemes:
-    bearerAuth: { type: http, scheme: bearer, description: Supabase user JWT or a scoped `mise_` integration token. }
+    bearerAuth: { type: http, scheme: bearer, description: Supabase user JWT or a scoped `shua_` integration token. }
   parameters:
     IdempotencyKey: { name: Idempotency-Key, in: header, required: true, schema: { type: string, minLength: 8, maxLength: 200 } }
     ConfirmationToken: { name: X-Confirmation-Token, in: header, required: false, schema: { type: string } }

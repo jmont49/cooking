@@ -43,7 +43,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => { if(demoMode)localStorage.setItem(KEY, JSON.stringify(state)); }, [state]);
 
   const refreshInventory=useCallback(async()=>{if(demoMode)return;setInventoryLoading(true);setInventoryError('');try{const [rows,ingredients]=await Promise.all([inventoryApi.list(),inventoryApi.ingredients()]);setState(s=>({...s,inventory:rows.map(mapInventory)}));setIngredientCatalog(ingredients)}catch(error){setInventoryError(error instanceof Error?error.message:'Inventory could not be loaded.')}finally{setInventoryLoading(false)}},[]);
-  useEffect(()=>{void refreshInventory()},[refreshInventory]);
+  useEffect(()=>{
+    void refreshInventory();
+    if(demoMode)return;
+    const refresh=()=>{if(document.visibilityState==='visible')void refreshInventory()};
+    window.addEventListener('focus',refresh);
+    document.addEventListener('visibilitychange',refresh);
+    const interval=window.setInterval(refresh,30000);
+    return()=>{window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);window.clearInterval(interval)};
+  },[refreshInventory]);
 
   const plannedRecipes = useMemo(() => state.meals.filter(m => m.status === 'planned' && m.recipeId).map(m => ({ recipe: state.recipes.find(r => r.id === m.recipeId)!, servings: m.servings })).filter(x => x.recipe), [state.meals,state.recipes]);
   const grocery = useMemo(() => groceryList(plannedRecipes, state.inventory), [plannedRecipes,state.inventory]);
