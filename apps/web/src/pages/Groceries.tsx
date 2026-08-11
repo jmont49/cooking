@@ -9,7 +9,7 @@ export function Groceries() {
     (n, g) => n + Math.max(1, Number(g.quantity) * 1.25),
     0,
   );
-  const budget = budgetSummary(s.monthlySpent, checkout.toFixed(2), "240");
+  const budget = budgetSummary(s.monthlySpent, checkout.toFixed(2), s.settings.monthlyBudget);
   const checked = s.grocery.filter((g) =>
     s.groceryChecked.includes(`${g.ingredientId}:${g.unit}`),
   );

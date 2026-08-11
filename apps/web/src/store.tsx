@@ -1,12 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import Decimal from 'decimal.js';
-import { consume, groceryList, prioritizeConfirmation, projected, release, reserve, scoreRecommendation, type GroceryRequirement, type InventoryItem, type PlannedMeal, type Recipe } from '@mise/domain';
+import { consume, defaultWeights, groceryList, prioritizeConfirmation, projected, release, reserve, scoreRecommendation, type GroceryRequirement, type InventoryItem, type PlannedMeal, type Recipe, type ScoreInput } from '@mise/domain';
 import { initialInventory, recipes as seedRecipes } from './data';
-import { inventoryApi, recipeApi, type IngredientOption, type InventoryRow } from './lib/api';
+import { inventoryApi, recipeApi, settingsApi, type IngredientOption, type InventoryRow, type UserSettings } from './lib/api';
 import { demoMode } from './lib/supabase';
 
 interface Feedback { id: string; mealTitle: string; rating: number; wouldMakeAgain: boolean; tags: string[]; notes: string; createdAt: string }
-interface State { inventory: InventoryItem[]; recipes: Recipe[]; meals: PlannedMeal[]; feedback: Feedback[]; confirmedIds: string[]; groceryChecked: string[]; monthlySpent: string }
+interface State { inventory: InventoryItem[]; recipes: Recipe[]; meals: PlannedMeal[]; feedback: Feedback[]; confirmedIds: string[]; groceryChecked: string[]; monthlySpent: string; settings: UserSettings }
 interface Store extends State {
   ingredientCatalog: IngredientOption[];
   inventoryLoading: boolean;
@@ -29,17 +29,20 @@ interface Store extends State {
   toggleGrocery(key: string): void;
   purchaseGroceries(): void;
   addRecipe(recipe: Recipe): void;
+  deleteRecipe(id: string): Promise<void>;
+  saveSettings(settings: UserSettings): Promise<void>;
   resetDemo(): void;
 }
 
 const KEY = 'mise-demo-state-v2';
-const initialState = (): State => ({ inventory: initialInventory, recipes: seedRecipes, meals: [], feedback: [{ id:'f1',mealTitle:'Ginger chicken rice bowls',rating:9,wouldMakeAgain:true,tags:['excellent seasoning','great leftovers'],notes:'Fast and excellent for lunch.',createdAt:new Date(Date.now()-5*86400000).toISOString() }], confirmedIds: [], groceryChecked: [], monthlySpent: '86.40' });
+export const defaultSettings:UserSettings={monthlyBudget:'240',weekdayLimit:40,planLunch:true,coveredStaples:true,exploration:40,preferredProteins:'Chicken, Salmon, Ground beef, Eggs, White fish',exclusions:'Avoid shrimp that requires extensive prep. Chicken thighs can have an undesirable taste.'};
+const initialState = (): State => ({ inventory: initialInventory, recipes: seedRecipes, meals: [], feedback: [{ id:'f1',mealTitle:'Ginger chicken rice bowls',rating:9,wouldMakeAgain:true,tags:['excellent seasoning','great leftovers'],notes:'Fast and excellent for lunch.',createdAt:new Date(Date.now()-5*86400000).toISOString() }], confirmedIds: [], groceryChecked: [], monthlySpent: '86.40',settings:defaultSettings });
 const Context = createContext<Store | null>(null);
 const mapInventory=(row:InventoryRow):InventoryItem=>({id:row.id,ingredientId:row.ingredient_id,name:row.ingredients.name,quantity:String(row.quantity),reserved:String(row.reserved_quantity),unit:row.unit,confidence:Number(row.confidence),...(row.estimated_expiration_date?{expiresOn:row.estimated_expiration_date}:{}),location:row.storage_locations?.name??'Unassigned',lastConfirmedAt:row.last_confirmed_at??new Date().toISOString()});
 const demoIngredients:IngredientOption[]=initialInventory.map(item=>({id:item.ingredientId,slug:item.ingredientId,name:item.name,category:item.location==='Pantry'?'Pantry':'Produce',default_unit:item.unit,perishable:Boolean(item.expiresOn),default_shelf_days:null}));
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<State>(() => { if(!demoMode)return {...initialState(),inventory:[],recipes:[],meals:[],feedback:[],confirmedIds:[]};try { return JSON.parse(localStorage.getItem(KEY) ?? '') as State; } catch { return initialState(); } });
+  const [state, setState] = useState<State>(() => { if(!demoMode)return {...initialState(),inventory:[],recipes:[],meals:[],feedback:[],confirmedIds:[],monthlySpent:'0'};try { const saved=JSON.parse(localStorage.getItem(KEY) ?? '') as Partial<State>;return {...initialState(),...saved,settings:{...defaultSettings,...saved.settings}}; } catch { return initialState(); } });
   const [ingredientCatalog,setIngredientCatalog]=useState<IngredientOption[]>(demoMode?demoIngredients:[]);
   const [inventoryLoading,setInventoryLoading]=useState(!demoMode);
   const [inventoryError,setInventoryError]=useState('');
@@ -49,6 +52,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const refreshInventory=useCallback(async()=>{if(demoMode)return;setInventoryLoading(true);setInventoryError('');try{const [rows,ingredients]=await Promise.all([inventoryApi.list(),inventoryApi.ingredients()]);setState(s=>({...s,inventory:rows.map(mapInventory)}));setIngredientCatalog(ingredients)}catch(error){setInventoryError(error instanceof Error?error.message:'Inventory could not be loaded.')}finally{setInventoryLoading(false)}},[]);
   const refreshRecipes=useCallback(async()=>{if(demoMode)return;setRecipesLoading(true);setRecipesError('');try{const recipes=await recipeApi.list();setState(s=>({...s,recipes}))}catch(error){setRecipesError(error instanceof Error?error.message:'Recipes could not be loaded.')}finally{setRecipesLoading(false)}},[]);
+  const refreshSettings=useCallback(async()=>{if(demoMode)return;try{const settings=await settingsApi.get();setState(s=>({...s,settings,monthlySpent:settings.monthlySpent}))}catch(error){console.error('Settings could not be loaded.',error)}},[]);
   useEffect(()=>{
     void refreshInventory();
     if(demoMode)return;
@@ -58,7 +62,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const interval=window.setInterval(refresh,30000);
     return()=>{window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);window.clearInterval(interval)};
   },[refreshInventory]);
-  useEffect(()=>{void refreshRecipes()},[refreshRecipes]);
+  useEffect(()=>{void refreshRecipes();void refreshSettings()},[refreshRecipes,refreshSettings]);
 
   const plannedRecipes = useMemo(() => state.meals.filter(m => m.status === 'planned' && m.recipeId).map(m => ({ recipe: state.recipes.find(r => r.id === m.recipeId)!, servings: m.servings })).filter(x => x.recipe), [state.meals,state.recipes]);
   const grocery = useMemo(() => groceryList(plannedRecipes, state.inventory), [plannedRecipes,state.inventory]);
@@ -68,9 +72,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const availability = recipe.ingredients.filter(need => state.inventory.some(item => item.ingredientId===need.ingredientId && Number(projected(item))>0)).length / recipe.ingredients.length;
     const expiring = recipe.ingredients.some(need => state.inventory.some(item => item.ingredientId===need.ingredientId && item.expiresOn && new Date(item.expiresOn).getTime()-Date.now()<3*86400000));
     const repeated = state.meals.some(m => state.recipes.find(r=>r.id===m.recipeId)?.protein===recipe.protein);
-    const values = { preference: ['Chicken','Salmon','Ground beef','Eggs','White fish'].includes(recipe.protein)?.9:.65, availability, expiration:expiring?1:.25, cost:Math.max(0,1-Number(recipe.estimatedCost)/25), budget:.85, variety:repeated?.25:.9, time:recipe.prepMinutes+recipe.cookMinutes<=40?1:.5, cleanup:1-(recipe.cleanup-1)/4, leftovers:recipe.leftoverQuality/5, confidence:state.feedback.some(f=>f.mealTitle===recipe.title)?.95:.6, exploration:['Tofu','Lentils','Chickpeas'].includes(recipe.protein)?.8:.45 };
-    return { recipe, score: scoreRecommendation(values) };
-  }).sort((a,b)=>b.score.totalScore-a.score.totalScore), [state.inventory,state.meals,state.recipes,state.feedback]);
+    const preferred=state.settings.preferredProteins.split(',').map(x=>x.trim().toLowerCase()).filter(Boolean);
+    const positivelyRated=state.feedback.some(f=>f.mealTitle===recipe.title&&f.rating>=7);
+    const likedProteins=new Set(state.feedback.filter(f=>f.rating>=7).map(f=>state.recipes.find(r=>r.title===f.mealTitle)?.protein.toLowerCase()).filter((x):x is string=>Boolean(x)));
+    const learnedProteinMatch=likedProteins.has(recipe.protein.toLowerCase());
+    const familiar=preferred.some(p=>recipe.protein.toLowerCase().includes(p)||p.includes(recipe.protein.toLowerCase()))||learnedProteinMatch;
+    const explorationMix=state.settings.exploration/100;
+    const remaining=Math.max(0,Number(state.settings.monthlyBudget)-Number(state.monthlySpent));
+    const values = { preference:familiar?.95:.35, availability, expiration:expiring?1:.25, cost:Math.max(0,1-Number(recipe.estimatedCost)/25), budget:remaining<=0?0:Math.max(0,1-Number(recipe.estimatedCost)/remaining), variety:repeated?.25:.9, time:recipe.prepMinutes+recipe.cookMinutes<=state.settings.weekdayLimit?1:.35, cleanup:1-(recipe.cleanup-1)/4, leftovers:state.settings.planLunch?recipe.leftoverQuality/5:.6, confidence:positivelyRated?.95:learnedProteinMatch?.75:.55, exploration:familiar?.2:Math.max(.55,explorationMix) };
+    const weights:ScoreInput={...defaultWeights,preference:defaultWeights.preference*(1-explorationMix*.65),confidence:defaultWeights.confidence*(1-explorationMix*.5),exploration:defaultWeights.exploration+explorationMix*.18,variety:defaultWeights.variety+explorationMix*.08};
+    return { recipe, score: scoreRecommendation(values,weights) };
+  }).sort((a,b)=>b.score.totalScore-a.score.totalScore), [state.inventory,state.meals,state.recipes,state.feedback,state.settings,state.monthlySpent]);
 
   const planMeal = (date:string,recipeId:string,servings?:number) => setState(s => {
     const recipe=s.recipes.find(r=>r.id===recipeId); if(!recipe)return s;
@@ -91,8 +103,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const toggleGrocery=(key:string)=>setState(s=>({...s,groceryChecked:s.groceryChecked.includes(key)?s.groceryChecked.filter(k=>k!==key):[...s.groceryChecked,key]}));
   const purchaseGroceries=()=>setState(s=>{const purchased=grocery.filter(g=>s.groceryChecked.includes(`${g.ingredientId}:${g.unit}`));let inventory=[...s.inventory];for(const row of purchased){const found=inventory.find(i=>i.ingredientId===row.ingredientId&&i.unit===row.unit);if(found)inventory=inventory.map(i=>i.id===found.id?{...i,quantity:String(Number(i.quantity)+Number(row.quantity)),confidence:1}:i);else inventory.push({id:crypto.randomUUID(),ingredientId:row.ingredientId,name:row.name,quantity:row.quantity,reserved:'0',unit:row.unit,confidence:1,location:'Pantry',lastConfirmedAt:new Date().toISOString()});}return {...s,inventory,groceryChecked:[],monthlySpent:String((Number(s.monthlySpent)+purchased.reduce((n,g)=>n+Math.max(1,Number(g.quantity)*1.25),0)).toFixed(2))};});
   const addRecipe=(recipe:Recipe)=>setState(s=>({...s,recipes:[recipe,...s.recipes]}));
+  const deleteRecipe=async(id:string)=>{setRecipesError('');try{if(!demoMode)await recipeApi.delete(id);setState(s=>({...s,recipes:s.recipes.filter(r=>r.id!==id),meals:s.meals.filter(m=>m.recipeId!==id)}))}catch(error){const message=error instanceof Error?error.message:'The recipe could not be deleted.';setRecipesError(message);throw error}};
+  const saveSettings=async(settings:UserSettings)=>{if(!demoMode)await settingsApi.update(settings);setState(s=>({...s,settings}))};
   const resetDemo=()=>setState(initialState());
-  return <Context.Provider value={{...state,ingredientCatalog,inventoryLoading,inventoryError,recipesLoading,recipesError,grocery,recommendations,confirmationQueue,planMeal,removeMeal,setMealStatus,confirmInventory,adjustInventory,addInventory,refreshInventory,refreshRecipes,completeMeal,addFeedback,toggleGrocery,purchaseGroceries,addRecipe,resetDemo}}>{children}</Context.Provider>;
+  return <Context.Provider value={{...state,ingredientCatalog,inventoryLoading,inventoryError,recipesLoading,recipesError,grocery,recommendations,confirmationQueue,planMeal,removeMeal,setMealStatus,confirmInventory,adjustInventory,addInventory,refreshInventory,refreshRecipes,completeMeal,addFeedback,toggleGrocery,purchaseGroceries,addRecipe,deleteRecipe,saveSettings,resetDemo}}>{children}</Context.Provider>;
 }
 
 export function useStore(){const store=useContext(Context);if(!store)throw new Error('StoreProvider missing');return store;}

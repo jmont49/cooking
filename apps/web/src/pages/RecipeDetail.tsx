@@ -16,7 +16,6 @@ export function RecipeDetail(){
       <div className="grid lg:grid-cols-[1fr_1.05fr]">
         <div className="relative grid min-h-[360px] place-items-center overflow-hidden bg-gradient-to-br from-[#c9a26b] to-[#6c4b32] text-9xl">
           {r.photoUrl?<img src={r.photoUrl} alt={`Representative serving of ${r.title}`} className="absolute inset-0 size-full object-cover"/>:<span aria-label="Tasteful recipe placeholder">{r.protein==='Chicken'?'🍗':r.protein.includes('fish')||r.protein==='Salmon'?'🐟':r.protein==='Eggs'?'🍳':'🍲'}</span>}
-          {r.photoAttribution&&<p className="absolute bottom-3 left-3 rounded-lg bg-black/65 px-2 py-1 text-[10px] text-white">Photo by <a className="underline" href={r.photoAttribution.photographerUrl} target="_blank" rel="noreferrer">{r.photoAttribution.photographerName}</a> on <a className="underline" href={r.photoAttribution.sourceUrl} target="_blank" rel="noreferrer">Unsplash</a></p>}
         </div>
         <div className="p-7 lg:p-10">
           <p className="eyebrow">{r.cuisine} · Version {r.version}</p><h1 className="mt-3 text-4xl leading-tight sm:text-5xl">{r.title}</h1><p className="mt-4 leading-7 text-ink/60">{r.description}</p>
