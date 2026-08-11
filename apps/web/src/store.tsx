@@ -105,7 +105,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const addRecipe=(recipe:Recipe)=>setState(s=>({...s,recipes:[recipe,...s.recipes]}));
   const deleteRecipe=async(id:string)=>{setRecipesError('');try{if(!demoMode)await recipeApi.delete(id);setState(s=>({...s,recipes:s.recipes.filter(r=>r.id!==id),meals:s.meals.filter(m=>m.recipeId!==id)}))}catch(error){const message=error instanceof Error?error.message:'The recipe could not be deleted.';setRecipesError(message);throw error}};
   const saveSettings=async(settings:UserSettings)=>{if(!demoMode)await settingsApi.update(settings);setState(s=>({...s,settings}))};
-  const resetDemo=()=>setState(initialState());
+  const resetDemo=()=>{for(const key of Object.keys(localStorage))if(key.startsWith('mise-weekly-prep-v1:'))localStorage.removeItem(key);setState(initialState())};
   return <Context.Provider value={{...state,ingredientCatalog,inventoryLoading,inventoryError,recipesLoading,recipesError,grocery,recommendations,confirmationQueue,planMeal,removeMeal,setMealStatus,confirmInventory,adjustInventory,addInventory,refreshInventory,refreshRecipes,completeMeal,addFeedback,toggleGrocery,purchaseGroceries,addRecipe,deleteRecipe,saveSettings,resetDemo}}>{children}</Context.Provider>;
 }
 

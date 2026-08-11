@@ -1,4 +1,4 @@
-import { CalendarDays, CookingPot, MoreHorizontal, Trash2 } from "lucide-react";
+import { CalendarDays, CookingPot, MoreHorizontal, Sparkles, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { EmptyState, PageTitle } from "../components/UI";
 import { useStore } from "../store";
@@ -11,12 +11,7 @@ export function ThisWeek() {
         eyebrow="Your current plan"
         title="This week, at a glance."
         description="Cook, skip, or change a meal. Reservations and groceries adjust when the plan changes."
-        action={
-          <Link className="btn-primary" to="/plan">
-            <CalendarDays size={17} />
-            Plan another day
-          </Link>
-        }
+        action={<div className="flex flex-wrap gap-2"><Link className="btn-secondary" to="/plan"><CalendarDays size={17}/>Plan another day</Link>{s.meals.some(meal=>meal.status==='planned')&&<Link className="btn-primary" to="/prep"><Sparkles size={17}/>Build Sunday prep</Link>}</div>}
       />
       {s.meals.length === 0 ? (
         <EmptyState

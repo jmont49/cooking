@@ -1,4 +1,4 @@
-import type { Recipe, Unit } from '@mise/domain';
+import type { Recipe, Unit, WeeklyPrepPlan } from '@mise/domain';
 import type { GeneratedRecipe } from '@mise/contracts';
 import { supabase } from './supabase';
 
@@ -12,6 +12,8 @@ export type IntegrationScope='inventory:read'|'inventory:write'|'recipes:read'|'
 export interface CreatedIntegrationToken{id:string;name:string;token_prefix:string;scopes:IntegrationScope[];created_at:string;token:string;displayedOnce:true}
 export interface PhotoCandidate{id:string;imageUrl:string;thumbUrl:string;altText:string;photographerName:string;photographerUrl:string;sourceUrl:string;downloadLocation:string;provider:'unsplash'}
 export interface RecipeJob{id:string;status:'queued'|'processing'|'ready'|'failed'|'saved'|'discarded';request:{protein:string;minutes:number;servings:number;notes:string};recipe_draft:GeneratedRecipe|null;photo_candidates:PhotoCandidate[];error_code:string|null;created_at:string;updated_at:string}
+export interface PrepRequestMeal{mealId:string;date:string;title:string;servings:number;recipeTitle:string;ingredients:Array<{ingredientId:string;name:string;quantity:string;unit:Unit}>;steps:string[];equipment:string[];safetyNote:string}
+export interface PrepJob{id:string;status:'queued'|'processing'|'ready'|'failed';week_start:string;source_fingerprint:string;request:{weekStart:string;sourceFingerprint:string;meals:PrepRequestMeal[]};prep_plan:WeeklyPrepPlan|null;completed_task_ids:string[];error_code:string|null;created_at:string;updated_at:string}
 export interface UserSettings{monthlyBudget:string;weekdayLimit:number;planLunch:boolean;coveredStaples:boolean;exploration:number;preferredProteins:string;exclusions:string}
 interface RecipeRow{id:string;title:string;description:string;primary_photo_url:string|null;photo_attribution:Recipe['photoAttribution']|null;recipe_tags:Array<{tag:string}>;recipe_versions:Array<{id:string;version:number;servings:string;prep_minutes:number;cook_minutes:number;difficulty:Recipe['difficulty'];estimated_cost:string|null;cuisine:string|null;protein:string|null;cleanup:number|null;leftover_quality:number|null;leftover_days:number|null;reheating:string|null;safety_notes:string[];equipment:string[];recipe_ingredients:Array<{ingredient_id:string|null;unresolved_name:string|null;quantity:string;unit:Unit;optional:boolean;sort_order:number;ingredients:{name:string}|null}>;recipe_steps:Array<{step_number:number;instruction:string}>}>}
 
@@ -56,6 +58,13 @@ export const recipeApi={
   createJob:(input:{protein:string;minutes:number;servings:number;notes:string})=>request<RecipeJob>('/v1/recipe-jobs',{method:'POST',body:JSON.stringify(input)}),
   getJob:(id:string)=>request<RecipeJob>(`/v1/recipe-jobs/${id}`),
   saveJob:(id:string,recipe:GeneratedRecipe,selectedPhoto:PhotoCandidate|null)=>request<{recipeId:string;recipeVersionId:string}>(`/v1/recipe-jobs/${id}/save`,{method:'POST',body:JSON.stringify({recipe,selectedPhoto})})
+};
+
+export const prepApi={
+  createJob:(input:{weekStart:string;sourceFingerprint:string;meals:PrepRequestMeal[]})=>request<PrepJob>('/v1/prep-jobs',{method:'POST',body:JSON.stringify(input)}),
+  latest:(weekStart:string)=>request<PrepJob|null>(`/v1/prep-jobs/latest?weekStart=${encodeURIComponent(weekStart)}`),
+  getJob:(id:string)=>request<PrepJob>(`/v1/prep-jobs/${id}`),
+  updateProgress:(id:string,completedTaskIds:string[])=>request<PrepJob>(`/v1/prep-jobs/${id}`,{method:'PATCH',body:JSON.stringify({completedTaskIds})})
 };
 
 export const settingsApi={

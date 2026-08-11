@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Shua Cooking Tool API
-  version: 1.0.0
+  version: 1.1.0
   description: Narrow, authenticated tools over Shua's deterministic cooking domain.
   license: { name: Private personal use, identifier: LicenseRef-Private }
 servers:
@@ -122,6 +122,45 @@ paths:
       responses:
         '201': { $ref: '#/components/responses/Success' }
         '422': { $ref: '#/components/responses/Error' }
+  /prep-jobs:
+    post:
+      operationId: createWeeklyPrepJob
+      summary: Queue a cohesive weekly prep request for Miso
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/WeeklyPrepJobRequest' } } }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '422': { $ref: '#/components/responses/Error' }
+  /prep-jobs/claim:
+    post:
+      operationId: claimWeeklyPrepJob
+      summary: Claim the oldest queued weekly prep job for a Miso worker with plans:write
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Error' }
+  /prep-jobs/{jobId}:
+    parameters: [ { name: jobId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    get:
+      operationId: getWeeklyPrepJob
+      summary: Read a weekly prep job and its progress
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      operationId: updateWeeklyPrepProgress
+      summary: Save completed weekly prep task identifiers
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '422': { $ref: '#/components/responses/Error' }
+  /prep-jobs/{jobId}/complete:
+    parameters: [ { name: jobId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      operationId: completeWeeklyPrepJob
+      summary: Submit a Miso prep plan for deterministic quantity validation
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '422': { $ref: '#/components/responses/Error' }
   /feedback/interpret:
     post:
       operationId: interpretFeedback
@@ -197,6 +236,17 @@ components:
         minutes: { type: integer, minimum: 10, maximum: 720 }
         servings: { type: integer, minimum: 1, maximum: 24 }
         notes: { type: string, maxLength: 2000 }
+    WeeklyPrepJobRequest:
+      type: object
+      required: [weekStart, sourceFingerprint, meals]
+      properties:
+        weekStart: { type: string, format: date }
+        sourceFingerprint: { type: string, minLength: 1, maxLength: 1000 }
+        meals:
+          type: array
+          minItems: 1
+          maxItems: 14
+          items: { type: object, additionalProperties: true }
     Error:
       type: object
       required: [requestId, error]

@@ -73,6 +73,43 @@ export interface PlannedMeal {
   leftoverFromMealId?: string;
 }
 
+export interface PrepAllocation {
+  mealId: string;
+  mealTitle: string;
+  mealDate: string;
+  quantity: Quantity;
+  unit: Unit;
+}
+
+export interface PrepIngredient {
+  ingredientId: string;
+  name: string;
+  totalQuantity: Quantity;
+  unit: Unit;
+  allocations: PrepAllocation[];
+}
+
+export interface WeeklyPrepTask {
+  id: string;
+  order: number;
+  title: string;
+  action: string;
+  estimatedMinutes: number;
+  weekdayMinutesSaved: number;
+  storage: string;
+  foodSafety?: string;
+  ingredients: PrepIngredient[];
+}
+
+export interface WeeklyPrepPlan {
+  weekStart: string;
+  summary: string;
+  totalMinutes: number;
+  estimatedWeeknightMinutesSaved: number;
+  generatedAt: string;
+  tasks: WeeklyPrepTask[];
+}
+
 export interface GroceryRequirement extends RecipeIngredient {
   recipeIds: string[];
   estimatedCost: Money;

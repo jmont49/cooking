@@ -28,3 +28,12 @@ test('recipe generation requires review before save',async({page})=>{
   await page.getByRole('button',{name:'Accept & save'}).click();
   await expect(page).toHaveURL(/\/recipes$/);
 });
+
+test('weekly prep combines identical ingredient work',async({page})=>{
+  await page.goto('/');
+  await page.evaluate(()=>{const state=JSON.parse(localStorage.getItem('mise-demo-state-v2')!);const now=new Date();const days=(now.getDay()+6)%7;now.setDate(now.getDate()-days);const date=(offset:number)=>{const value=new Date(now);value.setDate(value.getDate()+offset);return value.toISOString().slice(0,10)};state.meals=[{id:'prep-monday',date:date(0),slot:'dinner',recipeId:'chicken-tacos',title:'One-pan chicken fajita tacos',servings:4,status:'planned'},{id:'prep-wednesday',date:date(2),slot:'dinner',recipeId:'chicken-tacos',title:'One-pan chicken fajita tacos',servings:4,status:'planned'}];localStorage.setItem('mise-demo-state-v2',JSON.stringify(state))});
+  await page.goto('/prep');
+  await page.getByRole('button',{name:'Build prep plan'}).click();
+  await expect(page.getByText('2 count Onion')).toBeVisible();
+  await expect(page.getByText('Combined',{exact:true}).first()).toBeVisible();
+});
