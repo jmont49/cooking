@@ -23,6 +23,7 @@ export interface InventoryItem {
   unit: Unit;
   confidence: number;
   expiresOn?: string;
+  ingredientPhotoUrl?: string;
   location: string;
   lastConfirmedAt: string;
 }

@@ -2,6 +2,7 @@ import { ArrowLeft, CheckCircle2, ChefHat, Clock, DollarSign, GitBranch, Shoppin
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { projected, convert } from '@mise/domain';
 import { useStore } from '../store';
+import { RecipeArtwork } from '../components/UI';
 
 export function RecipeDetail(){
   const {id}=useParams();
@@ -15,7 +16,7 @@ export function RecipeDetail(){
     <section className="overflow-hidden rounded-[2rem] bg-white shadow-soft">
       <div className="grid lg:grid-cols-[1fr_1.05fr]">
         <div className="relative grid min-h-[360px] place-items-center overflow-hidden bg-gradient-to-br from-[#c9a26b] to-[#6c4b32] text-9xl">
-          {r.photoUrl?<img src={r.photoUrl} alt={`Representative serving of ${r.title}`} className="absolute inset-0 size-full object-cover"/>:<span aria-label="Tasteful recipe placeholder">{r.protein==='Chicken'?'🍗':r.protein.includes('fish')||r.protein==='Salmon'?'🐟':r.protein==='Eggs'?'🍳':'🍲'}</span>}
+          <RecipeArtwork recipe={r} loading="eager"/>
         </div>
         <div className="p-7 lg:p-10">
           <p className="eyebrow">{r.cuisine} · Version {r.version}</p><h1 className="mt-3 text-4xl leading-tight sm:text-5xl">{r.title}</h1><p className="mt-4 leading-7 text-ink/60">{r.description}</p>

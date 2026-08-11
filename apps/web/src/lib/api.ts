@@ -7,7 +7,7 @@ const apiUrl=(import.meta.env.VITE_API_URL as string|undefined)?.replace(/\/$/,'
 interface Envelope<T>{requestId:string;data:T}
 interface ErrorEnvelope{requestId:string;error:{code:string;message:string;retryable:boolean;confirmationToken?:string;summary?:string}}
 export interface IngredientOption{id:string;slug:string;name:string;category:string;default_unit:Unit;perishable:boolean;default_shelf_days:number|null}
-export interface InventoryRow{id:string;ingredient_id:string;quantity:string;reserved_quantity:string;unit:Unit;confidence:string;estimated_expiration_date:string|null;last_confirmed_at:string|null;ingredients:{name:string;category:string};storage_locations:{name:string}|null}
+export interface InventoryRow{id:string;ingredient_id:string;quantity:string;reserved_quantity:string;unit:Unit;confidence:string;estimated_expiration_date:string|null;last_confirmed_at:string|null;ingredients:{name:string;category:string;photo_url:string|null};storage_locations:{name:string}|null}
 export type IntegrationScope='inventory:read'|'inventory:write'|'recipes:read'|'recipes:write'|'plans:read'|'plans:write'|'cooking:write'|'feedback:write'|'groceries:read'|'groceries:write'|'budget:read';
 export interface CreatedIntegrationToken{id:string;name:string;token_prefix:string;scopes:IntegrationScope[];created_at:string;token:string;displayedOnce:true}
 export interface PhotoCandidate{id:string;imageUrl:string;thumbUrl:string;altText:string;photographerName:string;photographerUrl:string;sourceUrl:string;downloadLocation:string;provider:'unsplash'}
@@ -30,6 +30,7 @@ async function request<T>(path:string,init:RequestInit={}):Promise<T>{
 export const inventoryApi={
   list:()=>request<InventoryRow[]>('/v1/inventory'),
   ingredients:()=>request<IngredientOption[]>('/v1/ingredients'),
+  photo:(ingredientId:string)=>request<{imageUrl:string|null}>(`/v1/ingredients/${ingredientId}/photo`),
   add:(input:{ingredientId:string;quantity:string;unit:Unit;location:string;expiresOn?:string})=>request<InventoryRow>('/v1/inventory',{method:'POST',headers:{'idempotency-key':crypto.randomUUID()},body:JSON.stringify(input)}),
   async adjust(input:{inventoryItemId:string;quantityDelta:string;unit:Unit;reason:'manual'|'discarded'|'expired'|'cooking_difference'}){
     const idempotencyKey=crypto.randomUUID();
