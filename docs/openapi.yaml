@@ -78,6 +78,32 @@ paths:
       responses:
         '201': { $ref: '#/components/responses/Success' }
         '422': { $ref: '#/components/responses/Error' }
+  /recipes/{recipeId}/photo:
+    post:
+      operationId: uploadRecipePhoto
+      summary: Replace the signed-in user's tile image for an accessible recipe
+      parameters:
+        - in: path
+          name: recipeId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: JPEG, PNG, or WebP image no larger than 5 MB.
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '404': { $ref: '#/components/responses/Error' }
+        '413': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
   /recipes/generate:
     post:
       operationId: generateRecipeDraft

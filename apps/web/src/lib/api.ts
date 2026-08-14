@@ -23,7 +23,8 @@ async function request<T>(path:string,init:RequestInit={}):Promise<T>{
   if(!apiUrl||!supabase)throw new ShuaApiError('configuration_missing','Shua API configuration is missing.');
   const {data:{session}}=await supabase.auth.getSession();
   if(!session)throw new ShuaApiError('unauthorized','Your session expired. Sign in again.');
-  const response=await fetch(`${apiUrl}${path}`,{...init,headers:{authorization:`Bearer ${session.access_token}`,'content-type':'application/json',...(init.headers??{})}});
+  const formData=typeof FormData!=='undefined'&&init.body instanceof FormData;
+  const response=await fetch(`${apiUrl}${path}`,{...init,headers:{authorization:`Bearer ${session.access_token}`,...(formData?{}:{'content-type':'application/json'}),...(init.headers??{})}});
   const payload=await response.json() as Envelope<T>|ErrorEnvelope;
   if(!response.ok){const failure=payload as ErrorEnvelope;throw new ShuaApiError(failure.error?.code??'request_failed',failure.error?.message??'The request failed.',failure.error?.retryable,failure.error?.confirmationToken,failure.error?.summary)}
   return (payload as Envelope<T>).data;
@@ -63,6 +64,7 @@ export const recipeApi={
     }
     return total;
   },
+  uploadPhoto:(id:string,file:File)=>{const body=new FormData();body.set('file',file);return request<{imageUrl:string}>(`/v1/recipes/${id}/photo`,{method:'POST',body})},
   delete:(id:string)=>request<{deleted:true}>(`/v1/recipes/${id}`,{method:'DELETE'}),
   createJob:(input:{protein:string;minutes:number;servings:number;notes:string})=>request<RecipeJob>('/v1/recipe-jobs',{method:'POST',body:JSON.stringify(input)}),
   latestJob:()=>request<RecipeJob|null>('/v1/recipe-jobs/latest'),
