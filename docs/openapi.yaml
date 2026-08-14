@@ -56,6 +56,7 @@ paths:
     post:
       operationId: importRecipeCollection
       summary: Import up to 100 validated recipes while skipping duplicate titles
+      description: Recipe records are saved even when Unsplash is unavailable or has no suitable photo; image enrichment is best-effort and reported separately.
       requestBody:
         required: true
         content:

@@ -54,7 +54,15 @@ const mapRecipe=(row:RecipeRow):Recipe=>{const version=[...row.recipe_versions].
 export const recipeApi={
   list:async()=>((await request<RecipeRow[]>('/v1/recipes')).map(mapRecipe)),
   createManual:(recipe:GeneratedRecipe)=>request<{recipeId:string;recipeVersionId:string}>('/v1/recipes',{method:'POST',body:JSON.stringify(recipe)}),
-  importMany:(recipes:GeneratedRecipe[],retireTitles:string[]=[])=>request<{imported:number;skipped:number;retired:number;imagesAdded:number;imagesMissing:number}>('/v1/recipes/import',{method:'POST',body:JSON.stringify({recipes,retireTitles})}),
+  async importMany(recipes:GeneratedRecipe[],retireTitles:string[]=[]){
+    const total={imported:0,skipped:0,retired:0,imagesAdded:0,imagesMissing:0};
+    const batchSize=8;
+    for(let start=0;start<recipes.length;start+=batchSize){
+      const result=await request<typeof total>('/v1/recipes/import',{method:'POST',body:JSON.stringify({recipes:recipes.slice(start,start+batchSize),retireTitles:start===0?retireTitles:[]})});
+      for(const key of Object.keys(total) as Array<keyof typeof total>)total[key]+=result[key];
+    }
+    return total;
+  },
   delete:(id:string)=>request<{deleted:true}>(`/v1/recipes/${id}`,{method:'DELETE'}),
   createJob:(input:{protein:string;minutes:number;servings:number;notes:string})=>request<RecipeJob>('/v1/recipe-jobs',{method:'POST',body:JSON.stringify(input)}),
   latestJob:()=>request<RecipeJob|null>('/v1/recipe-jobs/latest'),

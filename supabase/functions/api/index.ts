@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.45.1';
-import { getAIProvider, recipeSchema, weeklyPrepPlanSchema } from '../_shared/ai.ts';
+import { getAIProvider, recipeSchema, weeklyPrepPlanSchema, type GeneratedRecipe } from '../_shared/ai.ts';
 
 const cors={'access-control-allow-origin':Deno.env.get('APP_URL')??'http://localhost:5173','access-control-allow-headers':'authorization,content-type,idempotency-key,x-confirmation-token','access-control-allow-methods':'GET,POST,PATCH,DELETE,OPTIONS','x-content-type-options':'nosniff','referrer-policy':'no-referrer'};
 const admin=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
@@ -55,7 +55,6 @@ Deno.serve(async req=>{const requestId=req.headers.get('x-request-id')??crypto.r
   if(req.method==='POST'&&path==='/recipes'){if(!auth.scopes.includes('*'))return error(requestId,'forbidden','Only the signed-in Shua app can save a manual recipe.',403);const parsed=recipeSchema.safeParse(await req.json());if(!parsed.success)return json(requestId,{code:'validation_error',message:'Review the recipe fields before saving.',retryable:false,fields:parsed.error.flatten()},422);const {data,error:e}=await admin.rpc('save_manual_recipe',{p_user:auth.userId,p_recipe:parsed.data});if(e)throw e;const {error:nutritionError}=await admin.from('recipe_versions').update({calories_per_serving:parsed.data.caloriesPerServing,protein_grams_per_serving:parsed.data.proteinGramsPerServing,leftover_days:1}).eq('id',data.recipeVersionId);if(nutritionError)throw nutritionError;return json(requestId,data,201)}
   if(req.method==='POST'&&path==='/recipes/import'){
     if(!auth.scopes.includes('*'))return error(requestId,'forbidden','Only the signed-in Shua app can import recipes.',403);
-    if(!Deno.env.get('UNSPLASH_ACCESS_KEY'))return error(requestId,'unsplash_unavailable','Set UNSPLASH_ACCESS_KEY before importing the starter collection so every recipe receives a photo.',503,true);
     const body=await req.json();const parsed=recipeSchema.array().min(1).max(100).safeParse(body.recipes);
     if(!parsed.success)return json(requestId,{code:'validation_error',message:'The recipe collection could not be imported.',retryable:false,fields:parsed.error.flatten()},422);
     const retireTitles=Array.isArray(body.retireTitles)?body.retireTitles.map((title:unknown)=>String(title).slice(0,200)).filter(Boolean).slice(0,100):[];
@@ -65,18 +64,20 @@ Deno.serve(async req=>{const requestId=req.headers.get('x-request-id')??crypto.r
     if(existingError)throw existingError;
     const existingByTitle=new Map((existing??[]).map(row=>[row.title.trim().toLowerCase(),row]));
     let imported=0,skipped=0,imagesAdded=0,imagesMissing=0;
+    const needsPhoto:Array<{id:string;recipe:GeneratedRecipe}>=[];
     for(const recipe of parsed.data){
       const title=recipe.title.trim().toLowerCase();const current=existingByTitle.get(title);
       if(current){
-        if(!current.primary_photo_url){const photo=await findRecipePhoto(recipe);if(!photo){imagesMissing++;continue}const {error:photoError}=await admin.from('recipes').update({primary_photo_url:photo.imageUrl,photo_attribution:photo}).eq('id',current.id).eq('user_id',auth.userId);if(photoError)throw photoError;await registerUnsplashDownload(photo);imagesAdded++}
+        if(!current.primary_photo_url)needsPhoto.push({id:current.id,recipe});
         skipped++;continue;
       }
-      const photo=await findRecipePhoto(recipe);if(!photo){imagesMissing++;continue}
       const {data:saved,error:e}=await admin.rpc('save_manual_recipe',{p_user:auth.userId,p_recipe:recipe});if(e)throw e;
-      const [{error:nutritionError},{error:photoError}]=await Promise.all([admin.from('recipe_versions').update({calories_per_serving:recipe.caloriesPerServing,protein_grams_per_serving:recipe.proteinGramsPerServing,leftover_days:1}).eq('id',saved.recipeVersionId),admin.from('recipes').update({primary_photo_url:photo.imageUrl,photo_attribution:photo}).eq('id',saved.recipeId).eq('user_id',auth.userId)]);
-      if(nutritionError)throw nutritionError;if(photoError)throw photoError;await registerUnsplashDownload(photo);
-      existingByTitle.set(title,{id:saved.recipeId,title:recipe.title,primary_photo_url:photo.imageUrl});imported++;imagesAdded++;
+      const {error:nutritionError}=await admin.from('recipe_versions').update({calories_per_serving:recipe.caloriesPerServing,protein_grams_per_serving:recipe.proteinGramsPerServing,leftover_days:1}).eq('id',saved.recipeVersionId);
+      if(nutritionError)throw nutritionError;
+      existingByTitle.set(title,{id:saved.recipeId,title:recipe.title,primary_photo_url:null});needsPhoto.push({id:saved.recipeId,recipe});imported++;
     }
+    const photos=Deno.env.get('UNSPLASH_ACCESS_KEY')?await Promise.all(needsPhoto.map(async item=>({item,photo:await findRecipePhoto(item.recipe).catch(()=>null)}))):needsPhoto.map(item=>({item,photo:null}));
+    for(const {item,photo} of photos){if(!photo){imagesMissing++;continue}const {error:photoError}=await admin.from('recipes').update({primary_photo_url:photo.imageUrl,photo_attribution:photo}).eq('id',item.id).eq('user_id',auth.userId);if(photoError)throw photoError;await registerUnsplashDownload(photo);imagesAdded++}
     return json(requestId,{imported,skipped,retired,imagesAdded,imagesMissing},201);
   }
   const deleteRecipeMatch=path.match(/^\/recipes\/([0-9a-f-]+)$/i);
