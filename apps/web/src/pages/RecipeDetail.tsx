@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckCircle2, ChefHat, Clock, DollarSign, GitBranch, ShoppingBasket, Star, Users } from 'lucide-react';
+import { ArrowLeft, Beef, CheckCircle2, ChefHat, Clock, DollarSign, Flame, GitBranch, ShoppingBasket, Users } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { projected, convert } from '@mise/domain';
 import { useStore } from '../store';
@@ -20,7 +20,7 @@ export function RecipeDetail(){
         </div>
         <div className="p-7 lg:p-10">
           <p className="eyebrow">{r.cuisine} · Version {r.version}</p><h1 className="mt-3 text-4xl leading-tight sm:text-5xl">{r.title}</h1><p className="mt-4 leading-7 text-ink/60">{r.description}</p>
-          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4"><Metric icon={<Clock/>} label="Total" value={`${r.prepMinutes+r.cookMinutes} min`}/><Metric icon={<Users/>} label="Serves" value={String(r.servings)}/><Metric icon={<DollarSign/>} label="Est. cost" value={`$${r.estimatedCost}`}/><Metric icon={<Star/>} label="Leftovers" value={`${r.leftoverQuality}/5`}/></div>
+          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-5"><Metric icon={<Clock/>} label="Total" value={`${r.prepMinutes+r.cookMinutes} min`}/><Metric icon={<Users/>} label="Serves" value={String(r.servings)}/><Metric icon={<Flame/>} label="Per serving" value={`~${r.caloriesPerServing} cal`}/><Metric icon={<Beef/>} label="Protein" value={`~${r.proteinGramsPerServing}g`}/><Metric icon={<DollarSign/>} label="Est. cost" value={`$${r.estimatedCost}`}/></div>
           <div className="mt-7 flex flex-wrap gap-2"><Link to="/plan" className="btn-primary"><ChefHat size={17}/>Plan this meal</Link><Link to="/recipes/generate" state={{adapt:r}} className="btn-secondary"><GitBranch size={17}/>Adapt</Link>{missing.length>0&&<Link to="/groceries" className="btn-secondary"><ShoppingBasket size={17}/>Add {missing.length} missing</Link>}</div>
         </div>
       </div>

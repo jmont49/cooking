@@ -52,6 +52,31 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/Success' }
         '401': { $ref: '#/components/responses/Error' }
+  /recipes/import:
+    post:
+      operationId: importRecipeCollection
+      summary: Import up to 100 validated recipes while skipping duplicate titles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recipes]
+              properties:
+                recipes:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items: { type: object }
+                retireTitles:
+                  type: array
+                  maxItems: 100
+                  description: Existing starter recipes to archive while refreshing the collection.
+                  items: { type: string, maxLength: 200 }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '422': { $ref: '#/components/responses/Error' }
   /recipes/generate:
     post:
       operationId: generateRecipeDraft
@@ -96,6 +121,13 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/Success' }
         '403': { $ref: '#/components/responses/Error' }
+  /recipe-jobs/latest:
+    get:
+      operationId: getLatestRecipeJob
+      summary: Restore the newest unfinished recipe request or review draft
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '401': { $ref: '#/components/responses/Error' }
   /recipe-jobs/{jobId}:
     parameters: [ { name: jobId, in: path, required: true, schema: { type: string, format: uuid } } ]
     get:
@@ -122,6 +154,14 @@ paths:
       responses:
         '201': { $ref: '#/components/responses/Success' }
         '422': { $ref: '#/components/responses/Error' }
+  /recipe-jobs/{jobId}/discard:
+    parameters: [ { name: jobId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      operationId: discardRecipeJob
+      summary: Discard an unfinished recipe request or review draft
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '409': { $ref: '#/components/responses/Error' }
   /prep-jobs:
     post:
       operationId: createWeeklyPrepJob
@@ -223,18 +263,18 @@ components:
     RecipeConstraints:
       type: object
       properties:
-        protein: { type: string }
-        servings: { type: number, exclusiveMinimum: 0 }
+        protein: { type: string, default: Chicken breast }
+        servings: { type: number, exclusiveMinimum: 0, default: 2 }
         budget: { type: number, exclusiveMinimum: 0 }
-        minutes: { type: integer, minimum: 5 }
+        minutes: { type: integer, minimum: 5, default: 35 }
         constraints: { type: array, items: { type: string } }
     RecipeJobRequest:
       type: object
       required: [protein, minutes, servings, notes]
       properties:
-        protein: { type: string, maxLength: 80 }
-        minutes: { type: integer, minimum: 10, maximum: 720 }
-        servings: { type: integer, minimum: 1, maximum: 24 }
+        protein: { type: string, maxLength: 80, default: Chicken breast }
+        minutes: { type: integer, minimum: 10, maximum: 720, default: 35 }
+        servings: { type: integer, minimum: 1, maximum: 24, default: 2 }
         notes: { type: string, maxLength: 2000 }
     WeeklyPrepJobRequest:
       type: object

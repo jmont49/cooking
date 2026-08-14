@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test.beforeEach(async ({page})=>{await page.goto('/settings');await page.evaluate(()=>localStorage.removeItem('mise-demo-state-v2'));await page.reload()});
+test.beforeEach(async ({page})=>{await page.goto('/settings');await page.evaluate(()=>localStorage.removeItem('mise-demo-state-v3'));await page.reload()});
 
 test('confirm, plan, shop, cook, and leave feedback',async({page})=>{
   await page.goto('/kitchen');
@@ -31,9 +31,9 @@ test('recipe generation requires review before save',async({page})=>{
 
 test('weekly prep combines identical ingredient work',async({page})=>{
   await page.goto('/');
-  await page.evaluate(()=>{const state=JSON.parse(localStorage.getItem('mise-demo-state-v2')!);const now=new Date();const days=(now.getDay()+6)%7;now.setDate(now.getDate()-days);const date=(offset:number)=>{const value=new Date(now);value.setDate(value.getDate()+offset);return value.toISOString().slice(0,10)};state.meals=[{id:'prep-monday',date:date(0),slot:'dinner',recipeId:'chicken-tacos',title:'One-pan chicken fajita tacos',servings:4,status:'planned'},{id:'prep-wednesday',date:date(2),slot:'dinner',recipeId:'chicken-tacos',title:'One-pan chicken fajita tacos',servings:4,status:'planned'}];localStorage.setItem('mise-demo-state-v2',JSON.stringify(state))});
+  await page.evaluate(()=>{const state=JSON.parse(localStorage.getItem('mise-demo-state-v3')!);const now=new Date();const days=(now.getDay()+6)%7;now.setDate(now.getDate()-days);const date=(offset:number)=>{const value=new Date(now);value.setDate(value.getDate()+offset);return value.toISOString().slice(0,10)};state.meals=[{id:'prep-monday',date:date(0),slot:'dinner',recipeId:'chicken-tacos',title:'One-pan chicken fajita tacos',servings:2,status:'planned'},{id:'prep-wednesday',date:date(2),slot:'dinner',recipeId:'chicken-tacos',title:'One-pan chicken fajita tacos',servings:2,status:'planned'}];localStorage.setItem('mise-demo-state-v3',JSON.stringify(state))});
   await page.goto('/prep');
   await page.getByRole('button',{name:'Build prep plan'}).click();
-  await expect(page.getByText('2 count Onion')).toBeVisible();
+  await expect(page.getByText('1 count Onion')).toBeVisible();
   await expect(page.getByText('Combined',{exact:true}).first()).toBeVisible();
 });

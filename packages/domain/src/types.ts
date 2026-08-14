@@ -49,6 +49,8 @@ export interface Recipe {
   cookMinutes: number;
   difficulty: 'Easy' | 'Medium' | 'Ambitious';
   estimatedCost: Money;
+  caloriesPerServing: number;
+  proteinGramsPerServing: number;
   cleanup: 1 | 2 | 3 | 4 | 5;
   leftoverQuality: 1 | 2 | 3 | 4 | 5;
   leftoverDays: number;

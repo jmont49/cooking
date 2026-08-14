@@ -3,7 +3,7 @@ import { budgetSummary, consume, convert, createDemoWeeklyPrepPlan, groceryList,
 import type { InventoryItem, Recipe } from './types.js';
 
 const chicken: InventoryItem = { id: 'i1', ingredientId: 'chicken', name: 'Chicken', quantity: '2', reserved: '0', unit: 'lb', confidence: 1, location: 'fridge', lastConfirmedAt: '2026-01-01' };
-const recipe: Recipe = { id: 'r1', version: 1, title: 'Chicken', description: '', cuisine: 'American', protein: 'Chicken', servings: 2, prepMinutes: 5, cookMinutes: 10, difficulty: 'Easy', estimatedCost: '8', cleanup: 1, leftoverQuality: 4, leftoverDays: 3, ingredients: [{ ingredientId: 'chicken', name: 'Chicken', quantity: '1', unit: 'lb' }], steps: ['Cook'], tags: [], reheating: 'Microwave', equipment: [] };
+const recipe: Recipe = { id: 'r1', version: 1, title: 'Chicken', description: '', cuisine: 'American', protein: 'Chicken', servings: 2, prepMinutes: 5, cookMinutes: 10, difficulty: 'Easy', estimatedCost: '8', caloriesPerServing:600, proteinGramsPerServing:45, cleanup: 1, leftoverQuality: 4, leftoverDays: 1, ingredients: [{ ingredientId: 'chicken', name: 'Chicken', quantity: '1', unit: 'lb' }], steps: ['Cook'], tags: [], reheating: 'Microwave', equipment: [] };
 
 describe('deterministic domain', () => {
   it('converts compatible units and rejects packages', () => { expect(convert('1', 'lb', 'oz')).toBe('16'); expect(convert('1', 'bag', 'cup')).toBeNull(); });
