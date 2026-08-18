@@ -71,6 +71,7 @@ export interface PlannedMeal {
   recipeId?: string;
   title: string;
   servings: number;
+  caloriesPerServing?: number;
   status: 'planned' | 'completed' | 'skipped' | 'eating_out' | 'flexible';
   leftoverFromMealId?: string;
 }

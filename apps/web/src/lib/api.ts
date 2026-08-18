@@ -66,6 +66,7 @@ export const recipeApi={
   },
   uploadPhoto:(id:string,file:File)=>{const body=new FormData();body.set('file',file);return request<{imageUrl:string}>(`/v1/recipes/${id}/photo`,{method:'POST',body})},
   delete:(id:string)=>request<{deleted:true}>(`/v1/recipes/${id}`,{method:'DELETE'}),
+  deleteAll:()=>request<{deleted:number}>('/v1/recipes',{method:'DELETE'}),
   createJob:(input:{protein:string;minutes:number;servings:number;notes:string})=>request<RecipeJob>('/v1/recipe-jobs',{method:'POST',body:JSON.stringify(input)}),
   latestJob:()=>request<RecipeJob|null>('/v1/recipe-jobs/latest'),
   getJob:(id:string)=>request<RecipeJob>(`/v1/recipe-jobs/${id}`),

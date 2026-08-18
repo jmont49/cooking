@@ -67,12 +67,49 @@ export function groceryList(recipes: Array<{ recipe: Recipe; servings: number }>
     rows.set(key, { ...need, quantity: scaled.plus(old?.quantity ?? 0).toFixed(), recipeIds: [...(old?.recipeIds ?? []), recipe.id], estimatedCost: old?.estimatedCost ?? '0' });
   }
   for (const row of rows.values()) {
-    const owned = inventory.filter((i) => i.ingredientId === row.ingredientId).reduce((sum, item) => {
-      const q = convert(projected(item), item.unit, row.unit); return q === null ? sum : sum.plus(q);
-    }, new Decimal(0));
-    row.quantity = Decimal.max(0, new Decimal(row.quantity).minus(owned)).toFixed();
+    // Inventory is intentionally presence-only: if an ingredient is listed in the
+    // kitchen, the cook has enough of it. Exact stock accounting is unnecessary.
+    if (inventory.some((item) => item.ingredientId === row.ingredientId && Number(item.quantity) > 0)) row.quantity = '0';
   }
   return [...rows.values()].filter((r) => new Decimal(r.quantity).greaterThan(0));
+}
+
+const pieceProteins = /(chicken breast|salmon fillet|salmon filet|filet mignon|tilapia fillet|white fish fillet)/i;
+
+/** Scale a recipe locally, without an AI call. Piece proteins stay at one piece
+ * per serving until the calorie multiplier rounds up to two or more pieces. */
+export function scaleRecipe(recipe: Recipe, servings = recipe.servings, caloriesPerServing = recipe.caloriesPerServing): Recipe {
+  const safeServings = Math.max(1, Math.round(servings));
+  const safeCalories = Math.max(50, Math.round(caloriesPerServing));
+  const servingFactor = new Decimal(safeServings).div(recipe.servings);
+  const calorieFactor = new Decimal(safeCalories).div(recipe.caloriesPerServing || 1);
+  const ingredients = recipe.ingredients.map((ingredient) => {
+    const pieceProtein = ingredient.unit === 'count' && pieceProteins.test(`${recipe.protein} ${ingredient.name}`);
+    const quantity = pieceProtein
+      ? new Decimal(Math.max(1, Math.round(calorieFactor.toNumber()))).times(safeServings)
+      : new Decimal(ingredient.quantity).times(servingFactor).times(calorieFactor);
+    return { ...ingredient, quantity: quantity.toSignificantDigits(8).toFixed() };
+  });
+  return {
+    ...recipe,
+    servings: safeServings,
+    caloriesPerServing: safeCalories,
+    proteinGramsPerServing: Math.max(0, Math.round(recipe.proteinGramsPerServing * calorieFactor.toNumber())),
+    estimatedCost: new Decimal(recipe.estimatedCost).times(servingFactor).times(calorieFactor).toDecimalPlaces(2).toFixed(2),
+    ingredients
+  };
+}
+
+/** Format decimal recipe amounts as familiar eighth-cup cooking fractions. */
+export function formatQuantity(quantity: Quantity): string {
+  const value = Number(quantity);
+  if (!Number.isFinite(value)) return quantity;
+  const rounded = Math.round(value * 8) / 8;
+  const whole = Math.floor(rounded + 1e-9);
+  const eighths = Math.round((rounded - whole) * 8);
+  if (eighths === 0) return String(whole);
+  const fractions: Record<number, string> = { 1: '1/8', 2: '1/4', 3: '3/8', 4: '1/2', 5: '5/8', 6: '3/4', 7: '7/8' };
+  return whole ? `${whole} ${fractions[eighths]}` : fractions[eighths]!;
 }
 
 export const defaultWeights: ScoreInput = { preference: .16, availability: .17, expiration: .12, cost: .1, budget: .08, variety: .1, time: .07, cleanup: .05, leftovers: .07, confidence: .05, exploration: .03 };
