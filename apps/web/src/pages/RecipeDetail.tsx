@@ -1,7 +1,7 @@
-import { ArrowLeft, Beef, CheckCircle2, ChefHat, Clock, DollarSign, Flame, GitBranch, ImageUp, Loader2, ShoppingBasket, Users } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { ArrowLeft, Beef, CheckCircle2, ChefHat, Clock, DollarSign, Flame, GitBranch, ImageUp, Loader2, Minus, Plus, ShoppingBasket, Users } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { projected, convert } from '@mise/domain';
+import { formatQuantity, scaleRecipe } from '@mise/domain';
 import { useStore } from '../store';
 import { RecipeArtwork } from '../components/UI';
 import { recipeApi } from '../lib/api';
@@ -17,7 +17,15 @@ export function RecipeDetail(){
   const [photoSaved,setPhotoSaved]=useState(false);
   const r=s.recipes.find(x=>x.id===id);
   if(!r)return <p>Recipe not found.</p>;
-  const missing=r.ingredients.filter(need=>!s.inventory.some(i=>i.ingredientId===need.ingredientId&&convert(projected(i),i.unit,need.unit)!==null&&Number(convert(projected(i),i.unit,need.unit))>=Number(need.quantity)));
+  return <RecipeDetailContent recipe={r} store={s} nav={nav} photoInput={photoInput} uploadingPhoto={uploadingPhoto} setUploadingPhoto={setUploadingPhoto} photoError={photoError} setPhotoError={setPhotoError} photoSaved={photoSaved} setPhotoSaved={setPhotoSaved}/>;
+}
+
+function RecipeDetailContent({recipe:r,store:s,nav,photoInput,uploadingPhoto,setUploadingPhoto,photoError,setPhotoError,photoSaved,setPhotoSaved}:{recipe:ReturnType<typeof useStore>['recipes'][number];store:ReturnType<typeof useStore>;nav:(delta:number)=>void;photoInput:React.RefObject<HTMLInputElement>;uploadingPhoto:boolean;setUploadingPhoto:(value:boolean)=>void;photoError:string;setPhotoError:(value:string)=>void;photoSaved:boolean;setPhotoSaved:(value:boolean)=>void}){
+  const [servings,setServings]=useState(r.servings);
+  const [calories,setCalories]=useState(r.caloriesPerServing);
+  const scaled=useMemo(()=>scaleRecipe(r,servings,calories),[r,servings,calories]);
+  const owned=(ingredientId:string)=>s.inventory.some(item=>item.ingredientId===ingredientId&&Number(item.quantity)>0);
+  const missing=scaled.ingredients.filter(need=>!owned(need.ingredientId));
   const uploadPhoto=async(file?:File)=>{if(!file)return;setPhotoError('');setPhotoSaved(false);if(!['image/jpeg','image/png','image/webp'].includes(file.type)){setPhotoError('Choose a JPEG, PNG, or WebP image.');return}if(file.size>5*1024*1024){setPhotoError('Choose an image smaller than 5 MB.');return}setUploadingPhoto(true);try{await recipeApi.uploadPhoto(r.id,file);await s.refreshRecipes();setPhotoSaved(true);window.setTimeout(()=>setPhotoSaved(false),2200)}catch(error){setPhotoError(error instanceof Error?error.message:'The recipe photo could not be uploaded.')}finally{setUploadingPhoto(false)}};
   return <>
     <button onClick={()=>nav(-1)} className="mb-6 flex items-center gap-2 text-sm font-semibold text-herb-700"><ArrowLeft size={16}/>Back to recipes</button>
@@ -29,14 +37,15 @@ export function RecipeDetail(){
         </div>
         <div className="p-7 lg:p-10">
           <p className="eyebrow">{r.cuisine} · Version {r.version}</p><h1 className="mt-3 text-4xl leading-tight sm:text-5xl">{r.title}</h1><p className="mt-4 leading-7 text-ink/60">{r.description}</p>
-          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-5"><Metric icon={<Clock/>} label="Total" value={`${r.prepMinutes+r.cookMinutes} min`}/><Metric icon={<Users/>} label="Serves" value={String(r.servings)}/><Metric icon={<Flame/>} label="Per serving" value={`~${r.caloriesPerServing} cal`}/><Metric icon={<Beef/>} label="Protein" value={`~${r.proteinGramsPerServing}g`}/><Metric icon={<DollarSign/>} label="Est. cost" value={`$${r.estimatedCost}`}/></div>
+          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-5"><Metric icon={<Clock/>} label="Total" value={`${r.prepMinutes+r.cookMinutes} min`}/><Metric icon={<Users/>} label="Serves" value={String(scaled.servings)}/><Metric icon={<Flame/>} label="Per serving" value={`~${scaled.caloriesPerServing} cal`}/><Metric icon={<Beef/>} label="Protein" value={`~${scaled.proteinGramsPerServing}g`}/><Metric icon={<DollarSign/>} label="Est. cost" value={`$${scaled.estimatedCost}`}/></div>
+          <div className="mt-7 grid gap-4 rounded-2xl bg-herb-50 p-4 sm:grid-cols-2"><div><p className="text-sm font-semibold text-herb-800">Number of servings</p><div className="mt-2 flex items-center gap-2"><button type="button" aria-label="Decrease servings" className="grid size-10 place-items-center rounded-xl bg-white text-herb-700" onClick={()=>setServings(value=>Math.max(1,value-1))}><Minus size={16}/></button><input aria-label="Number of servings" type="number" min="1" max="24" value={servings} onChange={event=>setServings(Math.max(1,Math.min(24,Number(event.target.value)||1)))} className="field w-20 text-center"/><button type="button" aria-label="Increase servings" className="grid size-10 place-items-center rounded-xl bg-white text-herb-700" onClick={()=>setServings(value=>Math.min(24,value+1))}><Plus size={16}/></button></div></div><label className="text-sm font-semibold text-herb-800">Calories per serving<input aria-label="Calories per serving" type="number" min="100" max="2000" step="25" value={calories} onChange={event=>setCalories(Math.max(100,Math.min(2000,Number(event.target.value)||r.caloriesPerServing)))} className="field mt-2"/><span className="mt-1 block text-xs font-normal text-ink/45">Ingredients resize instantly—no Miso call.</span></label></div>
           {(photoError||photoSaved)&&<p role={photoError?'alert':'status'} className={`mt-5 rounded-2xl p-3 text-sm ${photoError?'bg-red-50 text-red-700':'bg-herb-50 text-herb-800'}`}>{photoError||'Recipe photo updated.'}</p>}
-          <div className="mt-7 flex flex-wrap gap-2"><Link to="/plan" className="btn-primary"><ChefHat size={17}/>Plan this meal</Link><Link to="/recipes/generate" state={{adapt:r}} className="btn-secondary"><GitBranch size={17}/>Adapt</Link>{missing.length>0&&<Link to="/groceries" className="btn-secondary"><ShoppingBasket size={17}/>Add {missing.length} missing</Link>}</div>
+          <div className="mt-7 flex flex-wrap gap-2"><Link to="/plan" state={{recipeId:r.id,servings:scaled.servings,caloriesPerServing:scaled.caloriesPerServing}} className="btn-primary"><ChefHat size={17}/>Plan this meal</Link><Link to="/recipes/generate" state={{adapt:r}} className="btn-secondary"><GitBranch size={17}/>Adapt</Link>{missing.length>0&&<Link to="/groceries" className="btn-secondary"><ShoppingBasket size={17}/>{missing.length} missing</Link>}</div>
         </div>
       </div>
     </section>
     <div className="mt-7 grid gap-7 lg:grid-cols-[.8fr_1.2fr]">
-      <section className="card"><h2 className="text-3xl">Ingredients</h2><p className="mt-1 text-sm text-ink/50">For {r.servings} servings</p><ul className="mt-5 space-y-4">{r.ingredients.map((i,n)=>{const owned=s.inventory.some(x=>x.ingredientId===i.ingredientId&&Number(projected(x))>0);return <li key={n} className="flex items-center justify-between gap-3 border-b border-black/5 pb-3"><span><span className="font-semibold">{i.quantity} {i.unit}</span> {i.name}</span><span className={`pill ${owned?'bg-herb-100 text-herb-700':'bg-orange-100 text-orange-800'}`}>{owned?<><CheckCircle2 size={12}/>In kitchen</>:'Grocery'}</span></li>})}</ul><div className="mt-6 rounded-2xl bg-herb-50 p-4"><p className="text-sm font-semibold text-herb-700">Leftovers</p><p className="mt-1 text-sm text-ink/60">Keeps up to {r.leftoverDays} days. {r.reheating}</p></div></section>
+      <section className="card"><h2 className="text-3xl">Ingredients</h2><p className="mt-1 text-sm text-ink/50">For {scaled.servings} {scaled.servings===1?'serving':'servings'} at about {scaled.caloriesPerServing} calories each</p><ul className="mt-5 space-y-4">{scaled.ingredients.map((i,n)=>{const inKitchen=owned(i.ingredientId);return <li key={n} className="flex items-center justify-between gap-3 border-b border-black/5 pb-3"><span><span className="font-semibold">{formatQuantity(i.quantity)} {i.unit}</span> {i.name}</span><span className={`pill ${inKitchen?'bg-herb-100 text-herb-700':'bg-orange-100 text-orange-800'}`}>{inKitchen?<><CheckCircle2 size={12}/>In kitchen</>:'Grocery'}</span></li>})}</ul><div className="mt-6 rounded-2xl bg-herb-50 p-4"><p className="text-sm font-semibold text-herb-700">Leftovers</p><p className="mt-1 text-sm text-ink/60">Keeps up to {r.leftoverDays} days. {r.reheating}</p></div></section>
       <section className="card"><h2 className="text-3xl">Method</h2><ol className="mt-6 space-y-6">{r.steps.map((step,i)=><li key={i} className="flex gap-4"><span className="grid size-9 shrink-0 place-items-center rounded-full bg-herb-600 font-semibold text-white">{i+1}</span><p className="pt-1.5 leading-6 text-ink/75">{step}</p></li>)}</ol>{r.safetyNote&&<div className="mt-7 rounded-2xl bg-orange-50 p-4 text-sm text-orange-900"><strong>Food safety:</strong> {r.safetyNote}</div>}</section>
     </div>
   </>;

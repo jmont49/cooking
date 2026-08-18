@@ -19,6 +19,16 @@ on conflict do nothing;
 insert into public.inventory_transactions(user_id,inventory_item_id,kind,quantity_delta,unit,reason)
 select user_id,id,'starting',quantity,unit,'Development seed' from public.inventory_items where user_id='11111111-1111-4111-8111-111111111111' and not exists(select 1 from public.inventory_transactions);
 
+-- Presence-only pantry supplied by the cook. The numeric 1 is an internal
+-- compatibility marker; the UI never asks the user to maintain quantities.
+insert into public.inventory_items(user_id,ingredient_id,storage_location_id,quantity,reserved_quantity,unit,confidence,source,last_confirmed_at)
+select '11111111-1111-4111-8111-111111111111',ingredient.id,location.id,1,0,ingredient.default_unit,1,'presence-seed',now()
+from public.ingredients ingredient
+join public.storage_locations location on location.user_id='11111111-1111-4111-8111-111111111111' and location.name=case when ingredient.slug in ('eggs','parmesan') then 'Fridge' when ingredient.slug='chicken' then 'Freezer' else 'Pantry' end
+where ingredient.slug=any(array['chicken-broth','sugar','salt','pepper','slap-ya-mama','garlic-vodka-sauce','soy','yum-yum-sauce','garlic-salt','breadcrumbs','tapatio','teriyaki-sauce','red-pepper-flakes','onion-powder','thyme','lemon-pepper','curry-powder','cayenne','chipotle-seasoning','smoked-paprika','linguine','fettuccine','eggs','chicken','red-tomato-sauce','parmesan','chicken-bouillon','basmati-rice','minute-rice'])
+on conflict(user_id,ingredient_id,storage_location_id,unit) do update set quantity=1,reserved_quantity=0,confidence=1,last_confirmed_at=now();
+update public.inventory_items inventory set quantity=0,reserved_quantity=0 from public.ingredients ingredient where inventory.ingredient_id=ingredient.id and ingredient.slug='chicken' and inventory.unit<>'count';
+
 insert into public.recipes(user_id,title,description) values
 ('11111111-1111-4111-8111-111111111111','Lemon garlic chicken pasta','Silky lemon sauce, tender chicken, and spinach.'),
 ('11111111-1111-4111-8111-111111111111','Ginger chicken rice bowls','Savory glazed chicken and crisp vegetables.'),
