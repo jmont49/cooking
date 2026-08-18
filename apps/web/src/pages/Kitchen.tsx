@@ -1,6 +1,8 @@
 import { AlertCircle, CheckCircle2, Loader2, PackageCheck, Plus, Search, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { PageTitle } from '../components/UI';
+import { inventoryApi, type IngredientOption } from '../lib/api';
+import { demoMode } from '../lib/supabase';
 import { useStore } from '../store';
 
 export function Kitchen(){
@@ -23,12 +25,18 @@ export function Kitchen(){
 function AddInventory({onClose}:{onClose:()=>void}){
   const s=useStore();
   const available=s.ingredientCatalog.filter(option=>!s.inventory.some(item=>item.ingredientId===option.id&&Number(item.quantity)>0));
-  const [ingredientId,setIngredientId]=useState(available[0]?.id??'');
+  const [name,setName]=useState('');
+  const [ingredientId,setIngredientId]=useState('');
+  const [catalogMatches,setCatalogMatches]=useState<IngredientOption[]>([]);
   const [location,setLocation]=useState('Pantry');
   const [saving,setSaving]=useState(false);
   const [error,setError]=useState('');
-  useEffect(()=>{if(!ingredientId&&available[0])setIngredientId(available[0].id)},[ingredientId,available]);
-  const selected=s.ingredientCatalog.find(option=>option.id===ingredientId);
-  const submit=async(event:React.FormEvent)=>{event.preventDefault();if(!selected)return;setError('');setSaving(true);try{await s.addInventory({ingredientId,quantity:'1',unit:selected.default_unit,location});onClose()}catch(reason){setError(reason instanceof Error?reason.message:'Could not add this ingredient.')}finally{setSaving(false)}};
-  return <section className="card mb-8"><div className="flex items-start justify-between gap-4"><div><p className="eyebrow">Presence only</p><h2 className="mt-2 text-3xl">What do you have?</h2><p className="mt-2 text-sm text-ink/50">You will never be asked how much.</p></div><button onClick={onClose} aria-label="Close add ingredient form" className="rounded-full p-2 hover:bg-black/5"><X/></button></div><form onSubmit={submit} className="mt-6 grid gap-4 sm:grid-cols-[1fr_180px_auto]"><label className="text-sm font-semibold">Ingredient<select required className="field mt-2" value={ingredientId} onChange={event=>setIngredientId(event.target.value)}><option value="">Select an ingredient</option>{available.map(option=><option key={option.id} value={option.id}>{option.name} · {option.category}</option>)}</select></label><label className="text-sm font-semibold">Stored in<select className="field mt-2" value={location} onChange={event=>setLocation(event.target.value)}><option>Pantry</option><option>Fridge</option><option>Freezer</option></select></label><div className="flex items-end"><button disabled={saving||!ingredientId} className="btn-primary w-full">{saving?<Loader2 className="animate-spin" size={17}/>:<Plus size={17}/>}Add</button></div>{error&&<p role="alert" className="text-sm text-red-700 sm:col-span-full">{error}</p>}</form></section>;
+  const normalized=name.trim().toLowerCase();
+  useEffect(()=>{if(demoMode||normalized.length<2){setCatalogMatches([]);return}const timeout=window.setTimeout(()=>{void inventoryApi.ingredients(normalized).then(setCatalogMatches).catch(()=>setCatalogMatches([]))},200);return()=>window.clearTimeout(timeout)},[normalized]);
+  const suggestionSource=demoMode?available:catalogMatches.filter(option=>!s.inventory.some(item=>item.ingredientId===option.id&&Number(item.quantity)>0));
+  const suggestions=normalized?suggestionSource.filter(option=>option.name.toLowerCase().includes(normalized)).slice(0,5):[];
+  const selected=[...s.ingredientCatalog,...catalogMatches].find(option=>option.id===ingredientId)??suggestionSource.find(option=>option.name.toLowerCase()===normalized);
+  const changeName=(value:string)=>{setName(value);const exact=available.find(option=>option.name.toLowerCase()===value.trim().toLowerCase());setIngredientId(exact?.id??'')};
+  const submit=async(event:React.FormEvent)=>{event.preventDefault();const ingredientName=name.trim();if(!ingredientName)return;setError('');setSaving(true);try{await s.addInventory({...selected?.id?{ingredientId:selected.id}:{},ingredientName,quantity:'1',unit:selected?.default_unit??'count',location});onClose()}catch(reason){setError(reason instanceof Error?reason.message:'Could not add this ingredient.')}finally{setSaving(false)}};
+  return <section className="card mb-8"><div className="flex items-start justify-between gap-4"><div><p className="eyebrow">Presence only</p><h2 className="mt-2 text-3xl">What do you have?</h2><p className="mt-2 text-sm text-ink/50">Type any ingredient. Matching pantry suggestions appear as you type, but you can always add a new name.</p></div><button onClick={onClose} aria-label="Close add ingredient form" className="rounded-full p-2 hover:bg-black/5"><X/></button></div><form onSubmit={submit} className="mt-6 grid gap-4 sm:grid-cols-[1fr_180px_auto]"><label className="relative text-sm font-semibold">Ingredient<input required autoComplete="off" className="field mt-2" value={name} onChange={event=>changeName(event.target.value)} placeholder="Start typing, e.g. cilantro"/>{suggestions.length>0&&<span className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-2xl border border-black/10 bg-white shadow-xl">{suggestions.map(option=><button key={option.id} type="button" className="block w-full px-4 py-3 text-left text-sm hover:bg-herb-50" onClick={()=>{setName(option.name);setIngredientId(option.id)}}><strong>{option.name}</strong><span className="ml-2 text-xs font-normal text-ink/40">{option.category}</span></button>)}</span>}</label><label className="text-sm font-semibold">Stored in<select className="field mt-2" value={location} onChange={event=>setLocation(event.target.value)}><option>Pantry</option><option>Fridge</option><option>Freezer</option></select></label><div className="flex items-end"><button disabled={saving||!name.trim()} className="btn-primary w-full">{saving?<Loader2 className="animate-spin" size={17}/>:<Plus size={17}/>}Add</button></div>{error&&<p role="alert" className="text-sm text-red-700 sm:col-span-full">{error}</p>}</form></section>;
 }

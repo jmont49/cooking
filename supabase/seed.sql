@@ -25,7 +25,7 @@ insert into public.inventory_items(user_id,ingredient_id,storage_location_id,qua
 select '11111111-1111-4111-8111-111111111111',ingredient.id,location.id,1,0,ingredient.default_unit,1,'presence-seed',now()
 from public.ingredients ingredient
 join public.storage_locations location on location.user_id='11111111-1111-4111-8111-111111111111' and location.name=case when ingredient.slug in ('eggs','parmesan') then 'Fridge' when ingredient.slug='chicken' then 'Freezer' else 'Pantry' end
-where ingredient.slug=any(array['chicken-broth','sugar','salt','pepper','slap-ya-mama','garlic-vodka-sauce','soy','yum-yum-sauce','garlic-salt','breadcrumbs','tapatio','teriyaki-sauce','red-pepper-flakes','onion-powder','thyme','lemon-pepper','curry-powder','cayenne','chipotle-seasoning','smoked-paprika','linguine','fettuccine','eggs','chicken','red-tomato-sauce','parmesan','chicken-bouillon','basmati-rice','minute-rice'])
+where ingredient.slug=any(array['chicken-broth','sugar','salt','pepper','slap-ya-mama','garlic-vodka-sauce','soy','yum-yum-sauce','garlic-salt','breadcrumbs','tapatio','teriyaki-sauce','red-pepper-flakes','onion-powder','thyme','lemon-pepper','curry-powder','cayenne','chipotle-seasoning','smoked-paprika','linguine','fettuccine','eggs','chicken','red-tomato-sauce','parmesan','chicken-bouillon','basmati-rice','minute-rice','canola-oil','olive-oil'])
 on conflict(user_id,ingredient_id,storage_location_id,unit) do update set quantity=1,reserved_quantity=0,confidence=1,last_confirmed_at=now();
 update public.inventory_items inventory set quantity=0,reserved_quantity=0 from public.ingredients ingredient where inventory.ingredient_id=ingredient.id and ingredient.slug='chicken' and inventory.unit<>'count';
 

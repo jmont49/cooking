@@ -3,7 +3,7 @@ import { recipes } from './data';
 
 describe('preference-shaped starter catalog',()=>{
   it('contains a complete pantry-first two-serving collection with nutrition estimates',()=>{
-    expect(recipes.length).toBeGreaterThanOrEqual(12);
+    expect(recipes.length).toBeGreaterThanOrEqual(34);
     for(const recipe of recipes){
       expect(recipe.servings,recipe.title).toBe(2);
       expect(recipe.ingredients.length,recipe.title).toBeGreaterThanOrEqual(2);
@@ -21,7 +21,7 @@ describe('preference-shaped starter catalog',()=>{
 
   it('adds a detailed chicken-first collection with one breast per serving',()=>{
     const chickenFirst=recipes.filter(recipe=>recipe.tags.includes('chicken-first'));
-    expect(chickenFirst.length).toBeGreaterThanOrEqual(8);
+    expect(chickenFirst.length).toBeGreaterThanOrEqual(30);
     for(const recipe of chickenFirst){
       expect(recipe.protein,recipe.title).toBe('Chicken breast');
       expect(recipe.ingredients.length,recipe.title).toBeGreaterThanOrEqual(7);
@@ -30,5 +30,9 @@ describe('preference-shaped starter catalog',()=>{
       expect(recipe.prepMinutes+recipe.cookMinutes,recipe.title).toBeLessThanOrEqual(55);
       expect(recipe.ingredients.find(item=>item.ingredientId==='chicken')).toMatchObject({quantity:'2',unit:'count'});
     }
+  });
+
+  it('lists cooking oil explicitly in every starter recipe',()=>{
+    for(const recipe of recipes)expect(recipe.ingredients.some(item=>item.ingredientId==='canola-oil'||item.ingredientId==='olive-oil'),recipe.title).toBe(true);
   });
 });

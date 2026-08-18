@@ -19,7 +19,7 @@ describe('starter recipe import',()=>{
     const bodies:Array<{recipes:GeneratedRecipe[];retireTitles:string[]}>=[];
     const fetchMock=vi.fn(async(_input:string|URL|Request,init?:RequestInit)=>{
       const body=JSON.parse(String(init?.body)) as {recipes:GeneratedRecipe[];retireTitles:string[]};bodies.push(body);
-      return new Response(JSON.stringify({requestId:'test',data:{imported:body.recipes.length,skipped:0,retired:body.retireTitles.length,imagesAdded:0,imagesMissing:body.recipes.length}}),{status:201,headers:{'content-type':'application/json'}});
+      return new Response(JSON.stringify({requestId:'test',data:{imported:body.recipes.length,updated:0,skipped:0,retired:body.retireTitles.length,imagesAdded:0,imagesMissing:body.recipes.length}}),{status:201,headers:{'content-type':'application/json'}});
     });
     vi.stubGlobal('fetch',fetchMock);
     const {recipeApi}=await import('./api');
@@ -28,7 +28,7 @@ describe('starter recipe import',()=>{
 
     expect(bodies.map(body=>body.recipes.length)).toEqual([8,8,1]);
     expect(bodies.map(body=>body.retireTitles.length)).toEqual([2,0,0]);
-    expect(result).toEqual({imported:17,skipped:0,retired:2,imagesAdded:0,imagesMissing:17});
+    expect(result).toEqual({imported:17,updated:0,skipped:0,retired:2,imagesAdded:0,imagesMissing:17});
   });
 
   it('lets the browser set the multipart boundary for photo uploads',async()=>{

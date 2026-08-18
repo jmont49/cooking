@@ -1,4 +1,4 @@
-import { Bot, FilePlus2, LibraryBig, Loader2, Plus, Search, Trash2 } from 'lucide-react';
+import { Bot, FilePlus2, LibraryBig, Loader2, Plus, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { GeneratedRecipe } from '@mise/contracts';
@@ -16,7 +16,6 @@ export function Recipes(){
   const [q,setQ]=useState('');
   const [protein,setProtein]=useState('All');
   const [deleting,setDeleting]=useState('');
-  const [clearing,setClearing]=useState(false);
   const [importing,setImporting]=useState(false);
   const [importError,setImportError]=useState('');
   const [importMessage,setImportMessage]=useState('');
@@ -26,13 +25,11 @@ export function Recipes(){
   const filtered=s.recipes.filter(r=>(r.title+' '+r.cuisine+' '+r.tags.join(' ')).toLowerCase().includes(q.toLowerCase())&&(protein==='All'||r.protein===protein));
   const proteins=['All',...new Set(s.recipes.map(r=>r.protein))];
   const remove=async(id:string,title:string)=>{if(!confirm(`Delete “${title}”? It will be removed from your recipe collection.`))return;setDeleting(id);try{await s.deleteRecipe(id)}finally{setDeleting('')}};
-  const clearAll=async()=>{if(!s.recipes.length||!confirm(`Wipe all ${s.recipes.length} recipes? This also removes them from planned meals and cannot be undone.`))return;setClearing(true);try{await s.clearRecipes()}finally{setClearing(false)}};
   const asGenerated=(recipe:Recipe):GeneratedRecipe=>({title:recipe.title,description:recipe.description,servings:recipe.servings,prepMinutes:recipe.prepMinutes,cookMinutes:recipe.cookMinutes,difficulty:recipe.difficulty,estimatedCost:recipe.estimatedCost,caloriesPerServing:recipe.caloriesPerServing,proteinGramsPerServing:recipe.proteinGramsPerServing,ingredients:recipe.ingredients,steps:recipe.steps,equipment:recipe.equipment,safetyNotes:recipe.safetyNote?[recipe.safetyNote]:[],substitutions:[],tags:recipe.tags,cuisine:recipe.cuisine,protein:recipe.protein,cleanup:recipe.cleanup,leftoverQuality:recipe.leftoverQuality,leftoverDays:recipe.leftoverDays,reheating:recipe.reheating,flavorProfile:[],leftoverGuidance:recipe.reheating,imageSearchQuery:recipe.title,confidence:1,unresolvedIngredientMappings:[]});
-  const importStarter=async()=>{setImporting(true);setImportError('');setImportMessage('');try{const result=await recipeApi.importMany(starterRecipes.map(asGenerated),retiredStarterTitles);await s.refreshRecipes();const summary=result.imported||result.retired||result.imagesAdded?`${result.imported} new recipes added, ${result.imagesAdded} Unsplash images attached, ${result.retired} outdated recipes retired, and ${result.skipped} already present.`:`All ${starterRecipes.length} starter recipes are already present.`;setImportMessage(result.imagesMissing?`${summary} ${result.imagesMissing} recipes were synced without a photo and can be retried later.`:summary)}catch(error){setImportError(error instanceof Error?error.message:'The starter collection could not be imported.')}finally{setImporting(false)}};
+  const importStarter=async()=>{setImporting(true);setImportError('');setImportMessage('');try{const result=await recipeApi.importMany(starterRecipes.map(asGenerated),retiredStarterTitles);await s.refreshRecipes();const summary=`${result.imported} new recipes added, ${result.updated} existing recipes refreshed, ${result.imagesAdded} Unsplash images attached, and ${result.retired} outdated recipes retired.`;setImportMessage(result.imagesMissing?`${summary} ${result.imagesMissing} recipes were synced without a photo and can be retried later.`:summary)}catch(error){setImportError(error instanceof Error?error.message:'The starter collection could not be imported.')}finally{setImporting(false)}};
   const activeJob=misoJob&&['queued','processing','ready'].includes(misoJob.status)?misoJob:null;
 
   const actions=<div className="flex flex-wrap gap-2">
-    <button type="button" onClick={()=>void clearAll()} disabled={clearing||!s.recipes.length} className="btn-secondary text-red-700 disabled:opacity-40">{clearing?<Loader2 className="animate-spin" size={17}/>:<Trash2 size={17}/>}Wipe all recipes</button>
     {!demoMode&&<button type="button" onClick={()=>void importStarter()} disabled={importing} className="btn-secondary">{importing?<Loader2 className="animate-spin" size={17}/>:<LibraryBig size={17}/>}Sync starter collection</button>}
     <Link to="/recipes/new" className="btn-secondary"><FilePlus2 size={17}/>Add manually</Link>
     <Link to="/recipes/generate" className="btn-primary"><Plus size={17}/>Ask Miso for a recipe</Link>

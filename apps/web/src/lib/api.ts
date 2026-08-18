@@ -32,9 +32,9 @@ async function request<T>(path:string,init:RequestInit={}):Promise<T>{
 
 export const inventoryApi={
   list:()=>request<InventoryRow[]>('/v1/inventory'),
-  ingredients:()=>request<IngredientOption[]>('/v1/ingredients'),
+  ingredients:(query?:string)=>request<IngredientOption[]>(`/v1/ingredients${query?`?q=${encodeURIComponent(query)}`:''}`),
   photo:(ingredientId:string)=>request<{imageUrl:string|null}>(`/v1/ingredients/${ingredientId}/photo`),
-  add:(input:{ingredientId:string;quantity:string;unit:Unit;location:string;expiresOn?:string})=>request<InventoryRow>('/v1/inventory',{method:'POST',headers:{'idempotency-key':crypto.randomUUID()},body:JSON.stringify(input)}),
+  add:(input:{ingredientId?:string;ingredientName:string;quantity:string;unit:Unit;location:string;expiresOn?:string})=>request<InventoryRow>('/v1/inventory',{method:'POST',headers:{'idempotency-key':crypto.randomUUID()},body:JSON.stringify(input)}),
   async adjust(input:{inventoryItemId:string;quantityDelta:string;unit:Unit;reason:'manual'|'discarded'|'expired'|'cooking_difference'}){
     const idempotencyKey=crypto.randomUUID();
     try{return await request<InventoryRow>('/v1/inventory/adjust',{method:'POST',headers:{'idempotency-key':idempotencyKey},body:JSON.stringify(input)})}
@@ -56,17 +56,16 @@ export const recipeApi={
   list:async()=>((await request<RecipeRow[]>('/v1/recipes')).map(mapRecipe)),
   createManual:(recipe:GeneratedRecipe)=>request<{recipeId:string;recipeVersionId:string}>('/v1/recipes',{method:'POST',body:JSON.stringify(recipe)}),
   async importMany(recipes:GeneratedRecipe[],retireTitles:string[]=[]){
-    const total={imported:0,skipped:0,retired:0,imagesAdded:0,imagesMissing:0};
+    const total={imported:0,updated:0,skipped:0,retired:0,imagesAdded:0,imagesMissing:0};
     const batchSize=8;
     for(let start=0;start<recipes.length;start+=batchSize){
       const result=await request<typeof total>('/v1/recipes/import',{method:'POST',body:JSON.stringify({recipes:recipes.slice(start,start+batchSize),retireTitles:start===0?retireTitles:[]})});
-      for(const key of Object.keys(total) as Array<keyof typeof total>)total[key]+=result[key];
+      for(const key of Object.keys(total) as Array<keyof typeof total>)total[key]+=result[key]??0;
     }
     return total;
   },
   uploadPhoto:(id:string,file:File)=>{const body=new FormData();body.set('file',file);return request<{imageUrl:string}>(`/v1/recipes/${id}/photo`,{method:'POST',body})},
   delete:(id:string)=>request<{deleted:true}>(`/v1/recipes/${id}`,{method:'DELETE'}),
-  deleteAll:()=>request<{deleted:number}>('/v1/recipes',{method:'DELETE'}),
   createJob:(input:{protein:string;minutes:number;servings:number;notes:string})=>request<RecipeJob>('/v1/recipe-jobs',{method:'POST',body:JSON.stringify(input)}),
   latestJob:()=>request<RecipeJob|null>('/v1/recipe-jobs/latest'),
   getJob:(id:string)=>request<RecipeJob>(`/v1/recipe-jobs/${id}`),
